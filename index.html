@@ -18,7 +18,7 @@
 
   /* ========== 背景场景 ========== */
   body {
-    background: linear-gradient(180deg, #0a0e3a 0%, #1a237e 30%, #4a148c 60%, #7b1fa2 80%, #ce93d8 100%);
+    background: linear-gradient(180deg, #0b1628 0%, #0f2847 20%, #1a4a7a 40%, #2d6da8 60%, #4a90c4 80%, #7ab8e0 100%);
     position: relative;
   }
 
@@ -692,9 +692,117 @@
     .option-btn .num { font-size: 42px; }
     .flake-item { font-size: 42px; }
   }
+  /* 艾莎 SVG 头像 */
+  .elsa-svg {
+    display: inline-block;
+    filter: drop-shadow(0 4px 12px rgba(100, 180, 255, 0.4));
+  }
+  .elsa-svg-large { width: 110px; height: 110px; }
+  .elsa-svg-medium { width: 80px; height: 80px; }
+  .elsa-svg-small { width: 52px; height: 52px; }
+  .elsa-svg-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  /* 冰雪山脉背景层 */
+  .ice-mountains {
+    position: fixed;
+    bottom: 0; left: 0; width: 100%; height: 35%;
+    pointer-events: none; z-index: 0;
+    opacity: 0.12;
+  }
+
+  /* 极光效果 */
+  .aurora {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 40%;
+    pointer-events: none; z-index: 0;
+    background: linear-gradient(135deg, 
+      transparent 20%, 
+      rgba(100, 200, 255, 0.06) 35%, 
+      rgba(150, 100, 255, 0.04) 50%,
+      rgba(100, 255, 200, 0.05) 65%,
+      transparent 80%);
+    animation: aurora-shift 8s ease-in-out infinite alternate;
+  }
+  @keyframes aurora-shift {
+    0% { transform: translateX(-5%) skewX(-2deg); opacity: 0.5; }
+    100% { transform: translateX(5%) skewX(2deg); opacity: 1; }
+  }
 </style>
-</head>
+
+<!-- ===== 艾莎公主 SVG 头像（纯绘制，非截取） ===== -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <defs>
+    <symbol id="elsa-head" viewBox="0 0 200 200">
+      <!-- 头发底色(铂金色) -->
+      <ellipse cx="100" cy="95" rx="62" ry="68" fill="#f0e6c8"/>
+      <!-- 脸 -->
+      <ellipse cx="100" cy="108" rx="48" ry="52" fill="#fce4ec"/>
+      <!-- 腮红 -->
+      <circle cx="72" cy="118" r="10" fill="#f8bbd0" opacity="0.5"/>
+      <circle cx="128" cy="118" r="10" fill="#f8bbd0" opacity="0.5"/>
+      <!-- 头发-上部蓬松 -->
+      <path d="M 42 85 Q 42 35, 100 30 Q 158 35, 158 85 Q 155 55, 130 45 Q 100 38, 70 45 Q 45 55, 42 85 Z" fill="#f5deb3"/>
+      <!-- 头发-刘海 -->
+      <path d="M 55 80 Q 60 62, 80 58 Q 95 55, 100 60 Q 90 65, 80 72 Q 68 78, 55 80 Z" fill="#e8d5a0" opacity="0.8"/>
+      <path d="M 145 80 Q 140 65, 125 60 Q 110 55, 105 62 Q 115 66, 125 72 Q 135 78, 145 80 Z" fill="#e8d5a0" opacity="0.7"/>
+      <!-- 辫子(从右侧垂下) -->
+      <path d="M 130 90 Q 150 105, 148 130 Q 146 150, 138 168 Q 134 178, 128 182" 
+            fill="none" stroke="#e8d5a0" stroke-width="16" stroke-linecap="round"/>
+      <path d="M 130 90 Q 150 105, 148 130 Q 146 150, 138 168 Q 134 178, 128 182" 
+            fill="none" stroke="#f5deb3" stroke-width="10" stroke-linecap="round" opacity="0.5"/>
+      <!-- 辫子纹路 -->
+      <path d="M 140 110 Q 145 115, 143 120 M 142 130 Q 146 135, 143 140 M 140 150 Q 143 155, 140 160" 
+            fill="none" stroke="#d4c088" stroke-width="1.5" opacity="0.5"/>
+      <!-- 皇冠 -->
+      <path d="M 72 52 L 78 32 L 86 45 L 94 25 L 100 42 L 106 25 L 114 45 L 122 32 L 128 52 Z" 
+            fill="#b3e5fc" stroke="#81d4fa" stroke-width="1"/>
+      <!-- 皇冠宝石 -->
+      <circle cx="94" cy="38" r="3" fill="#e1f5fe"/>
+      <circle cx="106" cy="38" r="3" fill="#e1f5fe"/>
+      <circle cx="100" cy="32" r="3.5" fill="white" opacity="0.9"/>
+      <!-- 皇冠底边 -->
+      <rect x="72" y="49" width="56" height="5" rx="2" fill="#81d4fa"/>
+      <!-- 眼睛-左 -->
+      <ellipse cx="82" cy="108" rx="11" ry="12" fill="white"/>
+      <ellipse cx="84" cy="109" rx="7.5" ry="8" fill="#1e88e5"/>
+      <ellipse cx="84" cy="109" rx="5" ry="5.5" fill="#0d47a1"/>
+      <circle cx="86" cy="106" r="2.5" fill="white"/>
+      <circle cx="81" cy="112" r="1.2" fill="white" opacity="0.5"/>
+      <!-- 眼睛-右 -->
+      <ellipse cx="118" cy="108" rx="11" ry="12" fill="white"/>
+      <ellipse cx="116" cy="109" rx="7.5" ry="8" fill="#1e88e5"/>
+      <ellipse cx="116" cy="109" rx="5" ry="5.5" fill="#0d47a1"/>
+      <circle cx="118" cy="106" r="2.5" fill="white"/>
+      <circle cx="113" cy="112" r="1.2" fill="white" opacity="0.5"/>
+      <!-- 眼影(淡紫色) -->
+      <path d="M 70 103 Q 76 98, 82 100 Q 88 98, 94 103" fill="none" stroke="#ce93d8" stroke-width="2" opacity="0.3"/>
+      <path d="M 106 103 Q 112 98, 118 100 Q 124 98, 130 103" fill="none" stroke="#ce93d8" stroke-width="2" opacity="0.3"/>
+      <!-- 睫毛 -->
+      <path d="M 70 105 Q 68 102, 66 100" fill="none" stroke="#5d4037" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M 130 105 Q 132 102, 134 100" fill="none" stroke="#5d4037" stroke-width="1.5" stroke-linecap="round"/>
+      <!-- 眉毛 -->
+      <path d="M 72 96 Q 82 90, 92 94" fill="none" stroke="#8d6e63" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M 128 96 Q 118 90, 108 94" fill="none" stroke="#8d6e63" stroke-width="2.2" stroke-linecap="round"/>
+      <!-- 鼻子 -->
+      <path d="M 100 114 Q 97 120, 100 122 Q 103 120, 100 114" fill="#f8bbd0" opacity="0.4"/>
+      <!-- 嘴巴(微笑) -->
+      <path d="M 88 132 Q 94 140, 100 140 Q 106 140, 112 132" fill="none" stroke="#e91e63" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M 91 132 Q 96 137, 100 137 Q 104 137, 109 132" fill="#f48fb1" opacity="0.5"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ===== 冰雪山脉 SVG ===== -->
+<svg class="ice-mountains" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 150" preserveAspectRatio="none">
+  <path d="M0 150 L30 80 L60 120 L100 40 L140 90 L170 50 L200 100 L240 30 L280 85 L310 55 L340 95 L370 60 L400 90 L400 150 Z" fill="white" opacity="0.5"/>
+  <path d="M0 150 L50 100 L80 130 L120 70 L160 110 L190 75 L230 120 L260 60 L300 100 L340 80 L380 110 L400 90 L400 150 Z" fill="white" opacity="0.3"/>
+</svg>
 <body>
+
+<!-- 极光效果 -->
+<div class="aurora"></div>
 
 <!-- 星空背景 -->
 <div class="stars" id="stars"></div>
@@ -714,7 +822,7 @@
   <!-- ===== 开始页面 ===== -->
   <div id="start-screen">
     <div class="castle-emoji">🏰</div>
-    <div class="elsa-avatar">👸</div>
+    <svg class="elsa-svg elsa-svg-large elsa-svg-float" style="display:block;margin:10px auto"><use href="#elsa-head"/></svg>
     <div class="game-title">艾莎的<br>魔法数字王国</div>
     <div class="game-subtitle">和艾莎公主一起数雪花吧 ❄️</div>
     <button class="start-btn" onclick="startGame()">✨ 开始冒险 ✨</button>
@@ -722,7 +830,7 @@
 
   <!-- ===== 关卡选择页面 ===== -->
   <div id="level-select">
-    <div class="elsa-avatar" style="font-size:70px;margin-bottom:5px">👸</div>
+    <svg class="elsa-svg elsa-svg-medium elsa-svg-float" style="display:block;margin:0 auto 5px"><use href="#elsa-head"/></svg>
     <div class="select-title">选择关卡</div>
     <div class="select-subtitle">小公主想挑战哪一关呢？</div>
     <div class="level-cards" id="levelCards"></div>
@@ -741,7 +849,7 @@
     <div class="scene-area">
       <!-- 艾莎对话 -->
       <div class="elsa-dialog">
-        <div class="elsa-face">👸</div>
+        <svg class="elsa-svg elsa-svg-small elsa-svg-float" style="flex-shrink:0"><use href="#elsa-head"/></svg>
         <div class="dialog-bubble" id="dialogText">帮艾莎数一数魔法雪花吧！</div>
       </div>
 
