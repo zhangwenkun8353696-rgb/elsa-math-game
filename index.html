@@ -731,65 +731,153 @@
   }
 </style>
 
-<!-- ===== 艾莎公主 SVG 头像（纯绘制，非截取） ===== -->
+<!-- ===== 艾莎公主 SVG 头像 V2（纯绘制） ===== -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
   <defs>
-    <symbol id="elsa-head" viewBox="0 0 200 200">
-      <!-- 头发底色(铂金色) -->
-      <ellipse cx="100" cy="95" rx="62" ry="68" fill="#f0e6c8"/>
-      <!-- 脸 -->
-      <ellipse cx="100" cy="108" rx="48" ry="52" fill="#fce4ec"/>
-      <!-- 腮红 -->
-      <circle cx="72" cy="118" r="10" fill="#f8bbd0" opacity="0.5"/>
-      <circle cx="128" cy="118" r="10" fill="#f8bbd0" opacity="0.5"/>
-      <!-- 头发-上部蓬松 -->
-      <path d="M 42 85 Q 42 35, 100 30 Q 158 35, 158 85 Q 155 55, 130 45 Q 100 38, 70 45 Q 45 55, 42 85 Z" fill="#f5deb3"/>
-      <!-- 头发-刘海 -->
-      <path d="M 55 80 Q 60 62, 80 58 Q 95 55, 100 60 Q 90 65, 80 72 Q 68 78, 55 80 Z" fill="#e8d5a0" opacity="0.8"/>
-      <path d="M 145 80 Q 140 65, 125 60 Q 110 55, 105 62 Q 115 66, 125 72 Q 135 78, 145 80 Z" fill="#e8d5a0" opacity="0.7"/>
-      <!-- 辫子(从右侧垂下) -->
-      <path d="M 130 90 Q 150 105, 148 130 Q 146 150, 138 168 Q 134 178, 128 182" 
-            fill="none" stroke="#e8d5a0" stroke-width="16" stroke-linecap="round"/>
-      <path d="M 130 90 Q 150 105, 148 130 Q 146 150, 138 168 Q 134 178, 128 182" 
-            fill="none" stroke="#f5deb3" stroke-width="10" stroke-linecap="round" opacity="0.5"/>
-      <!-- 辫子纹路 -->
-      <path d="M 140 110 Q 145 115, 143 120 M 142 130 Q 146 135, 143 140 M 140 150 Q 143 155, 140 160" 
-            fill="none" stroke="#d4c088" stroke-width="1.5" opacity="0.5"/>
-      <!-- 皇冠 -->
-      <path d="M 72 52 L 78 32 L 86 45 L 94 25 L 100 42 L 106 25 L 114 45 L 122 32 L 128 52 Z" 
-            fill="#b3e5fc" stroke="#81d4fa" stroke-width="1"/>
+    <!-- 渐变定义 -->
+    <radialGradient id="skinGrad" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#fce8f0"/>
+      <stop offset="100%" stop-color="#f0d0dc"/>
+    </radialGradient>
+    <linearGradient id="hairGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f8f0d8"/>
+      <stop offset="50%" stop-color="#e8dbb8"/>
+      <stop offset="100%" stop-color="#d4c698"/>
+    </linearGradient>
+    <radialGradient id="eyeBlue" cx="45%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#42a5f5"/>
+      <stop offset="60%" stop-color="#1565c0"/>
+      <stop offset="100%" stop-color="#0d47a1"/>
+    </radialGradient>
+    <linearGradient id="dressGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4fc3f7"/>
+      <stop offset="100%" stop-color="#0288d1"/>
+    </linearGradient>
+    <linearGradient id="crownGrad" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#81d4fa"/>
+      <stop offset="50%" stop-color="#b3e5fc"/>
+      <stop offset="100%" stop-color="#e1f5fe"/>
+    </linearGradient>
+
+    <symbol id="elsa-head" viewBox="0 0 200 220">
+      <!-- 冰蓝色礼服肩膀 -->
+      <path d="M 52 185 Q 60 165, 100 160 Q 140 165, 148 185 L 155 220 L 45 220 Z" fill="url(#dressGrad)" opacity="0.9"/>
+      <!-- 礼服闪光装饰 -->
+      <circle cx="80" cy="190" r="1.5" fill="white" opacity="0.6"/>
+      <circle cx="105" cy="180" r="1" fill="white" opacity="0.5"/>
+      <circle cx="120" cy="192" r="1.5" fill="white" opacity="0.6"/>
+      <circle cx="90" cy="200" r="1" fill="white" opacity="0.4"/>
+      <!-- 脖子 -->
+      <rect x="90" y="152" width="20" height="15" rx="10" fill="#f5dce4"/>
+
+      <!-- 头发后层(铂金色，大轮廓) -->
+      <ellipse cx="100" cy="90" rx="66" ry="72" fill="url(#hairGrad)"/>
+
+      <!-- 脸(瓜子脸-尖下巴) -->
+      <path d="M 52 100 Q 50 80, 58 70 Q 70 58, 100 56 Q 130 58, 142 70 Q 150 80, 148 100 Q 146 125, 132 142 Q 118 155, 100 158 Q 82 155, 68 142 Q 54 125, 52 100 Z" fill="url(#skinGrad)"/>
+
+      <!-- 耳朵 -->
+      <ellipse cx="54" cy="105" rx="6" ry="10" fill="#f5dce4"/>
+      <ellipse cx="146" cy="105" rx="6" ry="10" fill="#f5dce4"/>
+
+      <!-- 头发-上部蓬松（覆盖在脸上方） -->
+      <path d="M 38 88 Q 36 42, 68 28 Q 88 20, 100 22 Q 112 20, 132 28 Q 164 42, 162 88
+               Q 158 60, 135 45 Q 115 35, 100 36 Q 85 35, 65 45 Q 42 60, 38 88 Z" fill="#efe0c0"/>
+      <!-- 头发高光 -->
+      <path d="M 55 70 Q 60 50, 80 40 Q 95 35, 100 38" fill="none" stroke="#f8f0d8" stroke-width="3" opacity="0.6" stroke-linecap="round"/>
+
+      <!-- 刘海-左（大弧度S型） -->
+      <path d="M 50 82 Q 55 60, 75 52 Q 90 47, 98 55 Q 88 58, 78 65 Q 65 75, 50 82 Z" fill="#e8d8b0"/>
+      <!-- 刘海-右 -->
+      <path d="M 150 82 Q 145 62, 128 54 Q 115 48, 105 56 Q 112 58, 122 64 Q 135 74, 150 82 Z" fill="#e0d0a8" opacity="0.85"/>
+
+      <!-- 辫子(从左肩垂下，更粗更有质感) -->
+      <path d="M 60 92 Q 38 110, 35 135 Q 33 160, 42 185 Q 48 200, 55 210" 
+            fill="none" stroke="#d8c898" stroke-width="22" stroke-linecap="round"/>
+      <!-- 辫子高光 -->
+      <path d="M 60 92 Q 38 110, 35 135 Q 33 160, 42 185 Q 48 200, 55 210" 
+            fill="none" stroke="#efe0c0" stroke-width="12" stroke-linecap="round" opacity="0.5"/>
+      <!-- 辫子编织纹路 -->
+      <path d="M 48 115 Q 40 118, 44 125" fill="none" stroke="#c4b080" stroke-width="1.2" opacity="0.5"/>
+      <path d="M 43 135 Q 36 138, 39 145" fill="none" stroke="#c4b080" stroke-width="1.2" opacity="0.5"/>
+      <path d="M 40 155 Q 34 158, 38 165" fill="none" stroke="#c4b080" stroke-width="1.2" opacity="0.5"/>
+      <path d="M 42 175 Q 38 178, 42 185" fill="none" stroke="#c4b080" stroke-width="1.2" opacity="0.5"/>
+      <!-- 辫子末端发带 -->
+      <circle cx="56" cy="210" r="5" fill="#81d4fa" opacity="0.7"/>
+
+      <!-- 腮红(柔和) -->
+      <ellipse cx="72" cy="125" rx="11" ry="7" fill="#f8bbd0" opacity="0.35"/>
+      <ellipse cx="128" cy="125" rx="11" ry="7" fill="#f8bbd0" opacity="0.35"/>
+
+      <!-- 眼影(淡紫蓝色) -->
+      <ellipse cx="82" cy="100" rx="15" ry="5" fill="#b39ddb" opacity="0.15"/>
+      <ellipse cx="118" cy="100" rx="15" ry="5" fill="#b39ddb" opacity="0.15"/>
+
+      <!-- 眼睛-左(更大更圆) -->
+      <ellipse cx="82" cy="107" rx="14" ry="15" fill="white"/>
+      <ellipse cx="84" cy="108" rx="10" ry="11" fill="url(#eyeBlue)"/>
+      <ellipse cx="84" cy="108" rx="6" ry="6.5" fill="#0d47a1"/>
+      <circle cx="84" cy="108" r="3" fill="#081838"/>
+      <!-- 眼睛高光 -->
+      <circle cx="88" cy="104" r="3.5" fill="white" opacity="0.9"/>
+      <circle cx="81" cy="112" r="1.8" fill="white" opacity="0.5"/>
+      <!-- 上眼线 -->
+      <path d="M 67 101 Q 75 95, 84 96 Q 92 95, 97 101" fill="none" stroke="#37474f" stroke-width="2.2" stroke-linecap="round"/>
+      <!-- 下眼线 -->
+      <path d="M 70 113 Q 78 119, 84 119 Q 90 119, 95 113" fill="none" stroke="#78909c" stroke-width="1" opacity="0.4"/>
+      <!-- 长睫毛-左眼 -->
+      <path d="M 68 102 Q 64 96, 62 92" fill="none" stroke="#37474f" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M 72 98 Q 69 93, 68 89" fill="none" stroke="#37474f" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M 76 96 Q 75 91, 75 88" fill="none" stroke="#37474f" stroke-width="1.2" stroke-linecap="round"/>
+
+      <!-- 眼睛-右(更大更圆) -->
+      <ellipse cx="118" cy="107" rx="14" ry="15" fill="white"/>
+      <ellipse cx="116" cy="108" rx="10" ry="11" fill="url(#eyeBlue)"/>
+      <ellipse cx="116" cy="108" rx="6" ry="6.5" fill="#0d47a1"/>
+      <circle cx="116" cy="108" r="3" fill="#081838"/>
+      <!-- 眼睛高光 -->
+      <circle cx="120" cy="104" r="3.5" fill="white" opacity="0.9"/>
+      <circle cx="113" cy="112" r="1.8" fill="white" opacity="0.5"/>
+      <!-- 上眼线 -->
+      <path d="M 103 101 Q 110 95, 116 96 Q 124 95, 133 101" fill="none" stroke="#37474f" stroke-width="2.2" stroke-linecap="round"/>
+      <!-- 下眼线 -->
+      <path d="M 105 113 Q 112 119, 118 119 Q 124 119, 130 113" fill="none" stroke="#78909c" stroke-width="1" opacity="0.4"/>
+      <!-- 长睫毛-右眼 -->
+      <path d="M 132 102 Q 136 96, 138 92" fill="none" stroke="#37474f" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M 128 98 Q 131 93, 132 89" fill="none" stroke="#37474f" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M 124 96 Q 125 91, 125 88" fill="none" stroke="#37474f" stroke-width="1.2" stroke-linecap="round"/>
+
+      <!-- 眉毛(细弯) -->
+      <path d="M 67 92 Q 77 84, 92 88" fill="none" stroke="#a0896a" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 133 92 Q 123 84, 108 88" fill="none" stroke="#a0896a" stroke-width="2" stroke-linecap="round"/>
+
+      <!-- 鼻子(小巧翘鼻) -->
+      <path d="M 100 116 L 97 126 Q 100 129, 103 126 Z" fill="#ecc8d0" opacity="0.5"/>
+      <path d="M 96 127 Q 100 130, 104 127" fill="none" stroke="#dda0a8" stroke-width="1" opacity="0.4"/>
+
+      <!-- 嘴巴(温暖微笑) -->
+      <path d="M 87 139 Q 93 146, 100 146 Q 107 146, 113 139" fill="none" stroke="#d81b60" stroke-width="2" stroke-linecap="round"/>
+      <!-- 上唇 -->
+      <path d="M 89 138 Q 94 135, 100 136 Q 106 135, 111 138" fill="none" stroke="#e57388" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+      <!-- 唇色填充 -->
+      <path d="M 89 138 Q 94 135, 100 136 Q 106 135, 111 138 Q 107 146, 100 146 Q 93 146, 89 138 Z" fill="#f48fb1" opacity="0.35"/>
+
+      <!-- 皇冠(精致冰晶风格) -->
+      <path d="M 68 55 L 74 30 L 82 44 L 90 22 L 96 38 L 100 18 L 104 38 L 110 22 L 118 44 L 126 30 L 132 55 Z" 
+            fill="url(#crownGrad)" stroke="#4fc3f7" stroke-width="0.8"/>
       <!-- 皇冠宝石 -->
-      <circle cx="94" cy="38" r="3" fill="#e1f5fe"/>
-      <circle cx="106" cy="38" r="3" fill="#e1f5fe"/>
-      <circle cx="100" cy="32" r="3.5" fill="white" opacity="0.9"/>
-      <!-- 皇冠底边 -->
-      <rect x="72" y="49" width="56" height="5" rx="2" fill="#81d4fa"/>
-      <!-- 眼睛-左 -->
-      <ellipse cx="82" cy="108" rx="11" ry="12" fill="white"/>
-      <ellipse cx="84" cy="109" rx="7.5" ry="8" fill="#1e88e5"/>
-      <ellipse cx="84" cy="109" rx="5" ry="5.5" fill="#0d47a1"/>
-      <circle cx="86" cy="106" r="2.5" fill="white"/>
-      <circle cx="81" cy="112" r="1.2" fill="white" opacity="0.5"/>
-      <!-- 眼睛-右 -->
-      <ellipse cx="118" cy="108" rx="11" ry="12" fill="white"/>
-      <ellipse cx="116" cy="109" rx="7.5" ry="8" fill="#1e88e5"/>
-      <ellipse cx="116" cy="109" rx="5" ry="5.5" fill="#0d47a1"/>
-      <circle cx="118" cy="106" r="2.5" fill="white"/>
-      <circle cx="113" cy="112" r="1.2" fill="white" opacity="0.5"/>
-      <!-- 眼影(淡紫色) -->
-      <path d="M 70 103 Q 76 98, 82 100 Q 88 98, 94 103" fill="none" stroke="#ce93d8" stroke-width="2" opacity="0.3"/>
-      <path d="M 106 103 Q 112 98, 118 100 Q 124 98, 130 103" fill="none" stroke="#ce93d8" stroke-width="2" opacity="0.3"/>
-      <!-- 睫毛 -->
-      <path d="M 70 105 Q 68 102, 66 100" fill="none" stroke="#5d4037" stroke-width="1.5" stroke-linecap="round"/>
-      <path d="M 130 105 Q 132 102, 134 100" fill="none" stroke="#5d4037" stroke-width="1.5" stroke-linecap="round"/>
-      <!-- 眉毛 -->
-      <path d="M 72 96 Q 82 90, 92 94" fill="none" stroke="#8d6e63" stroke-width="2.2" stroke-linecap="round"/>
-      <path d="M 128 96 Q 118 90, 108 94" fill="none" stroke="#8d6e63" stroke-width="2.2" stroke-linecap="round"/>
-      <!-- 鼻子 -->
-      <path d="M 100 114 Q 97 120, 100 122 Q 103 120, 100 114" fill="#f8bbd0" opacity="0.4"/>
-      <!-- 嘴巴(微笑) -->
-      <path d="M 88 132 Q 94 140, 100 140 Q 106 140, 112 132" fill="none" stroke="#e91e63" stroke-width="2.5" stroke-linecap="round"/>
-      <path d="M 91 132 Q 96 137, 100 137 Q 104 137, 109 132" fill="#f48fb1" opacity="0.5"/>
+      <circle cx="100" cy="28" r="4" fill="white" opacity="0.85"/>
+      <circle cx="100" cy="28" r="2" fill="#e1f5fe"/>
+      <circle cx="90" cy="34" r="2.5" fill="white" opacity="0.7"/>
+      <circle cx="110" cy="34" r="2.5" fill="white" opacity="0.7"/>
+      <circle cx="82" cy="40" r="2" fill="white" opacity="0.5"/>
+      <circle cx="118" cy="40" r="2" fill="white" opacity="0.5"/>
+      <!-- 皇冠底座 -->
+      <rect x="68" y="52" width="64" height="5" rx="2.5" fill="#4fc3f7" opacity="0.8"/>
+      <!-- 皇冠闪光 -->
+      <circle cx="96" cy="24" r="1" fill="white"/>
+      <circle cx="106" cy="26" r="0.8" fill="white"/>
+      <circle cx="86" cy="36" r="0.8" fill="white"/>
     </symbol>
   </defs>
 </svg>
