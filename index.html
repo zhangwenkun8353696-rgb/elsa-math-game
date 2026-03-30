@@ -283,6 +283,65 @@
     min-height: 24px;
   }
 
+  /* 算式展示区 */
+  .formula-display {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 8px 0;
+    padding: 10px 20px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 18px;
+    min-height: 52px;
+  }
+  .formula-display.show { display: flex; }
+  .formula-num {
+    font-size: 34px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 0 15px rgba(100, 181, 246, 0.6);
+    min-width: 36px;
+    text-align: center;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.4s ease-out;
+  }
+  .formula-num.show {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .formula-op {
+    font-size: 30px;
+    font-weight: bold;
+    color: #ffd54f;
+    text-shadow: 0 0 10px rgba(255, 213, 79, 0.5);
+    opacity: 0;
+    transition: all 0.4s ease-out;
+  }
+  .formula-op.show { opacity: 1; }
+  .formula-answer {
+    font-size: 38px;
+    font-weight: bold;
+    color: #ffd54f;
+    text-shadow: 0 0 20px rgba(255, 213, 79, 0.6);
+    min-width: 36px;
+    text-align: center;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.5s ease-out;
+  }
+  .formula-answer.show {
+    opacity: 1;
+    transform: scale(1);
+    animation: answer-pop 0.6s ease-out;
+  }
+  @keyframes answer-pop {
+    0% { transform: scale(0); }
+    60% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+
   /* 合并动画区域 */
   .merge-area {
     display: none;
@@ -721,6 +780,15 @@
       <!-- 计数提示 -->
       <div class="count-display" id="countDisplay"></div>
 
+      <!-- 算式展示 -->
+      <div class="formula-display" id="formulaDisplay">
+        <span class="formula-num" id="formulaA"></span>
+        <span class="formula-op" id="formulaPlus">+</span>
+        <span class="formula-num" id="formulaB"></span>
+        <span class="formula-op" id="formulaEquals">=</span>
+        <span class="formula-answer" id="formulaAnswer">?</span>
+      </div>
+
       <!-- 合并区域 -->
       <div class="merge-area" id="mergeArea"></div>
 
@@ -812,6 +880,53 @@ function playMagicSound() {
   for (let i = 0; i < 5; i++) {
     setTimeout(() => playTone(800 + Math.random()*800, 0.2, 'sine', 0.05), i*80);
   }
+}
+
+// ===== 艾莎语音系统 (TTS) =====
+let ttsVoice = null;
+let ttsReady = false;
+
+function initTTS() {
+  if (!window.speechSynthesis) return;
+  const loadVoices = () => {
+    const voices = speechSynthesis.getVoices();
+    // 优先选中文女声
+    ttsVoice = voices.find(v => v.lang.startsWith('zh') && v.name.includes('Female')) ||
+               voices.find(v => v.lang.startsWith('zh') && (v.name.includes('Ting') || v.name.includes('Li') || v.name.includes('Mei'))) ||
+               voices.find(v => v.lang.startsWith('zh-CN')) ||
+               voices.find(v => v.lang.startsWith('zh')) ||
+               null;
+    ttsReady = true;
+  };
+  loadVoices();
+  if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = loadVoices;
+  }
+}
+
+function elsaSpeak(text, callback) {
+  if (!window.speechSynthesis || !ttsReady) {
+    if (callback) setTimeout(callback, 500);
+    return;
+  }
+  // 取消之前正在说的
+  speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  if (ttsVoice) utterance.voice = ttsVoice;
+  utterance.lang = 'zh-CN';
+  utterance.rate = 0.85;  // 慢一点，适合小朋友
+  utterance.pitch = 1.3;  // 高一点，更可爱
+  utterance.volume = 1.0;
+  if (callback) {
+    utterance.onend = callback;
+  }
+  speechSynthesis.speak(utterance);
+}
+
+// 数字转中文读法
+function numToChinese(n) {
+  const map = ['零','一','二','三','四','五','六','七','八','九','十'];
+  return map[n] || String(n);
 }
 
 // ===== Let It Go 背景音乐 =====
@@ -1088,16 +1203,6 @@ function nextQuestion() {
   numB = pair[1];
   answer = numA + numB;
 
-  // 设置对话
-  const dialogTexts = [
-    '帮艾莎数一数魔法雪花吧！',
-    '再来数一数～',
-    '这次有多少呢？',
-    '艾莎又变出雪花啦！',
-    '最后一题啦，加油！',
-  ];
-  document.getElementById('dialogText').textContent = dialogTexts[currentQuestion] || dialogTexts[0];
-
   // 清空
   document.getElementById('groupA').innerHTML = '';
   document.getElementById('groupB').innerHTML = '';
@@ -1108,42 +1213,103 @@ function nextQuestion() {
   document.getElementById('countHintBtn').style.display = 'none';
   document.getElementById('optionsArea').innerHTML = '';
 
-  const emoji = level.flakeEmoji;
+  // 重置算式
+  const formulaDisp = document.getElementById('formulaDisplay');
+  formulaDisp.classList.remove('show');
+  document.getElementById('formulaA').textContent = '';
+  document.getElementById('formulaA').classList.remove('show');
+  document.getElementById('formulaPlus').classList.remove('show');
+  document.getElementById('formulaB').textContent = '';
+  document.getElementById('formulaB').classList.remove('show');
+  document.getElementById('formulaEquals').classList.remove('show');
+  document.getElementById('formulaAnswer').textContent = '?';
+  document.getElementById('formulaAnswer').classList.remove('show');
 
-  // 逐个显示雪花 - 左组
+  const emoji = level.flakeEmoji;
+  let delay = 100;
+
+  // === 第1步：艾莎说"来看看" ===
+  const openLines = [
+    '小公主，来看看！',
+    '艾莎要变魔法啦！',
+    '准备好了吗？看这里！',
+    '这次的魔法题来啦！',
+    '最后一题，加油呀！',
+  ];
+  const openLine = openLines[currentQuestion] || openLines[0];
+  document.getElementById('dialogText').textContent = openLine;
+  elsaSpeak(openLine);
+
+  delay += 1200;
+
+  // === 第2步：左组雪花逐个出现 + 语音说数量 ===
   for (let i = 0; i < numA; i++) {
     const flake = document.createElement('span');
     flake.className = 'flake-item';
     flake.textContent = emoji;
-    flake.dataset.index = i;
     document.getElementById('groupA').appendChild(flake);
     setTimeout(() => {
       flake.classList.add('show');
       playTone(400 + i * 80, 0.15, 'sine', 0.06);
-    }, 300 + i * 300);
+    }, delay + i * 350);
   }
+  delay += numA * 350 + 200;
 
-  // 逐个显示雪花 - 右组
+  // 说出左边数量 + 显示算式数字
+  setTimeout(() => {
+    const txt = numToChinese(numA) + '个' + (level.flakeEmoji === '❄️' ? '雪花' : level.flakeEmoji === '⛄' ? '雪人' : '钻石');
+    document.getElementById('dialogText').textContent = '这边有 ' + numA + ' 个！';
+    elsaSpeak('这边有' + txt);
+    // 显示算式第一个数
+    document.getElementById('formulaDisplay').classList.add('show');
+    document.getElementById('formulaA').textContent = numA;
+    document.getElementById('formulaA').classList.add('show');
+  }, delay);
+  delay += 1200;
+
+  // === 第3步：右组雪花逐个出现 ===
   for (let i = 0; i < numB; i++) {
     const flake = document.createElement('span');
     flake.className = 'flake-item';
     flake.textContent = emoji;
-    flake.dataset.index = numA + i;
     document.getElementById('groupB').appendChild(flake);
     setTimeout(() => {
       flake.classList.add('show');
       playTone(400 + (numA + i) * 80, 0.15, 'sine', 0.06);
-    }, 300 + numA * 300 + 200 + i * 300);
+    }, delay + i * 350);
   }
+  delay += numB * 350 + 200;
 
-  // 全部显示完后，展示"数一数"按钮和选项
-  const totalDelay = 300 + (numA + numB) * 300 + 500;
+  // 说出右边数量 + 显示加号和第二个数
+  setTimeout(() => {
+    const txt2 = numToChinese(numB) + '个' + (level.flakeEmoji === '❄️' ? '雪花' : level.flakeEmoji === '⛄' ? '雪人' : '钻石');
+    document.getElementById('dialogText').textContent = '这边有 ' + numB + ' 个！';
+    elsaSpeak('这边有' + txt2);
+    document.getElementById('formulaPlus').classList.add('show');
+    document.getElementById('formulaB').textContent = numB;
+    document.getElementById('formulaB').classList.add('show');
+  }, delay);
+  delay += 1200;
+
+  // === 第4步：提出加法问题 ===
+  setTimeout(() => {
+    const question = numA + ' 加 ' + numB + ' 等于几呢？';
+    document.getElementById('dialogText').textContent = numA + ' + ' + numB + ' = ？';
+    elsaSpeak(numToChinese(numA) + '加' + numToChinese(numB) + '等于几呢？');
+    document.getElementById('formulaEquals').classList.add('show');
+    document.getElementById('formulaAnswer').textContent = '?';
+    document.getElementById('formulaAnswer').classList.add('show');
+  }, delay);
+  delay += 1500;
+
+  // === 第5步：显示选项和"数一数"按钮 ===
   setTimeout(() => {
     document.getElementById('countHintBtn').style.display = 'block';
+    document.getElementById('countDisplay').textContent = '👆 不确定的话，点雪花数一数';
     showOptions();
     isAnimating = false;
     canAnswer = true;
-  }, totalDelay);
+  }, delay);
 }
 
 // ===== 数一数功能 =====
@@ -1161,6 +1327,9 @@ function startCounting() {
   mergeArea.style.display = 'flex';
   document.getElementById('snowflakeDisplay').style.display = 'none';
 
+  elsaSpeak('把它们放在一起，数一数吧！');
+  document.getElementById('dialogText').textContent = '放在一起，数一数吧！';
+
   for (let i = 0; i < answer; i++) {
     const flake = document.createElement('span');
     flake.className = 'flake-item show';
@@ -1171,7 +1340,7 @@ function startCounting() {
     mergeArea.appendChild(flake);
   }
 
-  document.getElementById('countDisplay').textContent = '👆 点一朵，数一朵！';
+  document.getElementById('countDisplay').textContent = '👆 点一个，数一个！';
 }
 
 function countFlake(idx) {
@@ -1183,20 +1352,35 @@ function countFlake(idx) {
   countIndex++;
   playCountSound(countIndex - 1);
 
-  document.getElementById('countDisplay').textContent = '数到了 ' + countIndex + ' ！';
+  // 语音报数
+  elsaSpeak(numToChinese(countIndex));
+
+  document.getElementById('countDisplay').textContent = countIndex + ' ！';
 
   if (countIndex >= answer) {
-    document.getElementById('countDisplay').textContent = '一共 ' + answer + ' 个！太棒了！🎉';
-    // 高亮正确答案
+    // 数完了！说出完整算式
     setTimeout(() => {
-      const btns = document.querySelectorAll('.option-btn');
-      btns.forEach(b => {
-        if (parseInt(b.dataset.value) === answer) {
-          b.style.border = '3px solid #ffd54f';
-          b.style.boxShadow = '0 0 20px rgba(255,213,79,0.5)';
-        }
-      });
-    }, 500);
+      const formulaText = numA + ' + ' + numB + ' = ' + answer + ' ！';
+      document.getElementById('countDisplay').textContent = formulaText + ' 🎉';
+      document.getElementById('dialogText').textContent = '对啦！' + formulaText;
+      elsaSpeak('一共' + numToChinese(answer) + '个！所以，' +
+                numToChinese(numA) + '加' + numToChinese(numB) + '等于' + numToChinese(answer) + '！');
+
+      // 更新算式展示
+      document.getElementById('formulaAnswer').textContent = answer;
+      document.getElementById('formulaAnswer').classList.add('show');
+
+      // 高亮正确答案按钮
+      setTimeout(() => {
+        const btns = document.querySelectorAll('.option-btn');
+        btns.forEach(b => {
+          if (parseInt(b.dataset.value) === answer) {
+            b.style.border = '3px solid #ffd54f';
+            b.style.boxShadow = '0 0 20px rgba(255,213,79,0.5)';
+          }
+        });
+      }, 800);
+    }, 300);
   }
 }
 
@@ -1255,30 +1439,45 @@ function checkAnswer(val, btn) {
     starsEarned++;
     updateStarsBar();
 
-    // 对话更新
-    const praises = ['太棒了！你真聪明！✨', '哇！答对啦！💙', '小公主真厉害！👏', '艾莎为你鼓掌！🎉', '完美！太了不起了！🌟'];
-    document.getElementById('dialogText').textContent = praises[currentQuestion] || praises[0];
+    // 显示完整算式
+    const formulaText = numA + ' + ' + numB + ' = ' + answer;
+    document.getElementById('formulaAnswer').textContent = answer;
+    document.getElementById('formulaAnswer').classList.add('show');
+    document.getElementById('dialogText').textContent = formulaText + '  太棒了！✨';
+    document.getElementById('countDisplay').textContent = '';
+
+    // 艾莎语音说出完整公式 + 鼓励
+    const praises = ['太棒了！', '你真聪明！', '小公主真厉害！', '太了不起了！', '完美！'];
+    const praise = praises[currentQuestion] || praises[0];
+    elsaSpeak(numToChinese(numA) + '加' + numToChinese(numB) + '等于' + numToChinese(answer) + '！' + praise);
 
     // 魔法粒子特效
     createMagicBurst(btn);
 
-    // 进入下一题
+    // 进入下一题（多等一会让语音说完）
     setTimeout(() => {
       currentQuestion++;
       nextQuestion();
-    }, 1500);
+    }, 2500);
   } else {
-    // 答错 - 温柔引导
+    // 答错 - 温柔引导 + 语音鼓励
     btn.classList.add('wrong-flash');
     playWrongSound();
     setTimeout(() => btn.classList.remove('wrong-flash'), 400);
 
-    const encourages = ['再数一数呀～💙', '没关系，再试试！', '仔细数数看～❄️'];
-    document.getElementById('dialogText').textContent = encourages[Math.floor(Math.random() * encourages.length)];
+    const encourages = [
+      { text: '再想想呀～💙', voice: '再想想呀，不着急！' },
+      { text: '没关系，再试试！❄️', voice: '没关系的，再试一次！' },
+      { text: '数一数就知道啦～', voice: '点雪花数一数就知道啦！' },
+    ];
+    const enc = encourages[Math.floor(Math.random() * encourages.length)];
+    document.getElementById('dialogText').textContent = enc.text;
+    elsaSpeak(enc.voice);
 
     // 如果还没进入数一数模式，显示按钮
     if (!isCountingMode) {
       document.getElementById('countHintBtn').style.display = 'block';
+      document.getElementById('countDisplay').textContent = '👆 试试数一数吧';
     }
   }
 }
@@ -1375,6 +1574,7 @@ function replayLevel() {
 window.addEventListener('DOMContentLoaded', () => {
   initStars();
   initSnow();
+  initTTS();
 });
 
 // 防止页面滚动弹跳
