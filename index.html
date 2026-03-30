@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>艾莎的魔法数字王国</title>
+<style>
+  /* ========== 全局重置 ========== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ========== 背景场景 ========== */
+  body {
+    background: linear-gradient(180deg, #0a0e3a 0%, #1a237e 30%, #4a148c 60%, #7b1fa2 80%, #ce93d8 100%);
+    position: relative;
+  }
+
+  /* 星空背景 */
+  .stars {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
+  }
+  .star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    animation: twinkle 2s ease-in-out infinite alternate;
+  }
+  @keyframes twinkle {
+    0% { opacity: 0.3; transform: scale(0.8); }
+    100% { opacity: 1; transform: scale(1.2); }
+  }
+
+  /* 持续飘落的雪花背景 */
+  .snow-bg {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 1; overflow: hidden;
+  }
+  .snow-particle {
+    position: absolute;
+    color: white;
+    opacity: 0.6;
+    animation: snow-fall linear infinite;
+    top: -30px;
+  }
+  @keyframes snow-fall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 0.6; }
+    100% { transform: translateY(110vh) rotate(360deg); opacity: 0.2; }
+  }
+
+  /* ========== 主容器 ========== */
+  #app {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ========== 开始页面 ========== */
+  #start-screen {
+    text-align: center;
+    animation: fadeIn 1s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .castle-emoji {
+    font-size: 80px;
+    animation: float 3s ease-in-out infinite;
+    text-shadow: 0 0 30px rgba(147, 197, 253, 0.5);
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+  }
+
+  .elsa-avatar {
+    font-size: 100px;
+    display: block;
+    margin: 10px auto;
+    animation: float 3s ease-in-out infinite;
+    animation-delay: 0.5s;
+  }
+
+  .game-title {
+    font-size: 28px;
+    font-weight: bold;
+    color: #e1f5fe;
+    text-shadow: 0 0 20px rgba(100, 181, 246, 0.8), 0 2px 4px rgba(0,0,0,0.3);
+    margin: 15px 0;
+    line-height: 1.4;
+  }
+  .game-subtitle {
+    font-size: 16px;
+    color: #b3e5fc;
+    margin-bottom: 25px;
+  }
+
+  .start-btn {
+    display: inline-block;
+    padding: 18px 50px;
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+    background: linear-gradient(135deg, #7c4dff, #448aff, #40c4ff);
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 8px 25px rgba(68, 138, 255, 0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+    transition: all 0.3s;
+    animation: pulse-btn 2s ease-in-out infinite;
+  }
+  .start-btn:active {
+    transform: scale(0.95);
+    box-shadow: 0 4px 15px rgba(68, 138, 255, 0.3);
+  }
+  @keyframes pulse-btn {
+    0%, 100% { box-shadow: 0 8px 25px rgba(68, 138, 255, 0.4); }
+    50% { box-shadow: 0 8px 40px rgba(68, 138, 255, 0.7), 0 0 60px rgba(68, 138, 255, 0.3); }
+  }
+
+  /* ========== 游戏页面 ========== */
+  #game-screen {
+    display: none;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+  }
+
+  /* 顶部信息栏 */
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    padding-top: max(12px, env(safe-area-inset-top));
+  }
+  .level-badge {
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px);
+    padding: 6px 16px;
+    border-radius: 20px;
+    color: #e1f5fe;
+    font-size: 14px;
+    font-weight: bold;
+  }
+  .stars-bar {
+    display: flex;
+    gap: 4px;
+    font-size: 22px;
+  }
+  .star-icon {
+    transition: all 0.3s;
+    filter: grayscale(1) opacity(0.3);
+  }
+  .star-icon.earned {
+    filter: none;
+    animation: star-pop 0.5s ease-out;
+  }
+  @keyframes star-pop {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.5); }
+    100% { transform: scale(1); }
+  }
+
+  /* 场景区域 */
+  .scene-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    position: relative;
+    min-height: 0;
+  }
+
+  /* 艾莎对话框 */
+  .elsa-dialog {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 15px;
+    max-width: 340px;
+  }
+  .elsa-face {
+    font-size: 50px;
+    flex-shrink: 0;
+    animation: float 3s ease-in-out infinite;
+  }
+  .dialog-bubble {
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    border-top-left-radius: 5px;
+    padding: 12px 16px;
+    color: white;
+    font-size: 16px;
+    line-height: 1.5;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  }
+
+  /* 雪花展示区 */
+  .snowflake-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 10px 0 5px;
+    flex-wrap: wrap;
+    min-height: 90px;
+  }
+  .flake-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    padding: 10px 15px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 20px;
+    min-width: 60px;
+    align-items: center;
+  }
+  .flake-item {
+    font-size: 36px;
+    opacity: 0;
+    transform: scale(0);
+    cursor: pointer;
+    transition: transform 0.2s;
+    filter: drop-shadow(0 0 8px rgba(100, 181, 246, 0.6));
+  }
+  .flake-item.show {
+    opacity: 1;
+    transform: scale(1);
+    animation: flake-appear 0.5s ease-out;
+  }
+  .flake-item.counted {
+    animation: flake-bounce 0.3s ease-out;
+    filter: drop-shadow(0 0 15px rgba(255, 235, 59, 0.8));
+  }
+  @keyframes flake-appear {
+    0% { opacity: 0; transform: scale(0) rotate(-180deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0deg); }
+  }
+  @keyframes flake-bounce {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.4); }
+    100% { transform: scale(1); }
+  }
+
+  .plus-sign {
+    font-size: 36px;
+    color: #ffd54f;
+    font-weight: bold;
+    text-shadow: 0 0 15px rgba(255, 213, 79, 0.5);
+  }
+  .equals-area {
+    text-align: center;
+    margin: 8px 0;
+  }
+  .equals-sign {
+    font-size: 30px;
+    color: #ffd54f;
+    font-weight: bold;
+  }
+  .count-display {
+    font-size: 18px;
+    color: #b3e5fc;
+    margin-top: 5px;
+    min-height: 24px;
+  }
+
+  /* 合并动画区域 */
+  .merge-area {
+    display: none;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    padding: 12px 20px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 20px;
+    min-width: 60px;
+    align-items: center;
+    margin: 10px 0;
+  }
+  .merge-area .flake-item {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* 提示数一数按钮 */
+  .count-hint-btn {
+    display: none;
+    margin: 8px auto;
+    padding: 10px 28px;
+    font-size: 16px;
+    color: white;
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 25px;
+    cursor: pointer;
+    backdrop-filter: blur(5px);
+    transition: all 0.3s;
+  }
+  .count-hint-btn:active {
+    transform: scale(0.95);
+    background: rgba(255,255,255,0.25);
+  }
+
+  /* 选项区域 */
+  .options-area {
+    padding: 15px 20px;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+  }
+  .option-btn {
+    width: 90px;
+    height: 110px;
+    border-radius: 22px;
+    border: 3px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  }
+  .option-btn:active {
+    transform: scale(0.93);
+  }
+  .option-btn .num {
+    font-size: 36px;
+    font-weight: bold;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+  .option-btn .mini-flakes {
+    font-size: 10px;
+    line-height: 1.2;
+    max-width: 75px;
+    text-align: center;
+    word-break: break-all;
+  }
+  .option-btn.correct-flash {
+    background: rgba(76, 175, 80, 0.5) !important;
+    border-color: #66bb6a !important;
+    animation: correct-shake 0.5s ease-out;
+  }
+  @keyframes correct-shake {
+    0%, 100% { transform: scale(1); }
+    25% { transform: scale(1.1) rotate(-3deg); }
+    50% { transform: scale(1.15); }
+    75% { transform: scale(1.1) rotate(3deg); }
+  }
+  .option-btn.wrong-flash {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255,255,255,0.15) !important;
+    animation: wrong-shake 0.4s ease-out;
+  }
+  @keyframes wrong-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+  }
+
+  /* ========== 庆祝特效 ========== */
+  .celebration {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .celebration.active {
+    display: block;
+  }
+  .confetti {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    animation: confetti-fall 1.5s ease-out forwards;
+  }
+  @keyframes confetti-fall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+
+  /* 魔法粒子特效 */
+  .magic-burst {
+    position: fixed;
+    pointer-events: none;
+    z-index: 90;
+  }
+  .magic-particle {
+    position: absolute;
+    border-radius: 50%;
+    animation: magic-fly 1s ease-out forwards;
+  }
+  @keyframes magic-fly {
+    0% { transform: translate(0,0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+  }
+
+  /* ========== 关卡完成页面 ========== */
+  #level-complete {
+    display: none;
+    text-align: center;
+    animation: fadeIn 0.8s ease-out;
+  }
+  .complete-emoji {
+    font-size: 80px;
+    animation: float 2s ease-in-out infinite;
+  }
+  .complete-title {
+    font-size: 28px;
+    font-weight: bold;
+    color: #ffd54f;
+    text-shadow: 0 0 20px rgba(255, 213, 79, 0.5);
+    margin: 15px 0;
+  }
+  .complete-subtitle {
+    font-size: 16px;
+    color: #e1f5fe;
+    margin-bottom: 25px;
+  }
+  .complete-stars {
+    font-size: 40px;
+    margin-bottom: 25px;
+    letter-spacing: 5px;
+  }
+  .next-btn {
+    display: inline-block;
+    padding: 16px 45px;
+    font-size: 22px;
+    font-weight: bold;
+    color: white;
+    background: linear-gradient(135deg, #ffd54f, #ff6f00);
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 8px 25px rgba(255, 111, 0, 0.4);
+    margin: 8px;
+  }
+  .next-btn:active { transform: scale(0.95); }
+  .next-btn.replay {
+    background: linear-gradient(135deg, #7c4dff, #448aff);
+    box-shadow: 0 8px 25px rgba(68, 138, 255, 0.4);
+  }
+
+  /* ========== 全部完成页面 ========== */
+  #all-complete {
+    display: none;
+    text-align: center;
+    animation: fadeIn 1s ease-out;
+  }
+  .crown { font-size: 100px; animation: float 2s ease-in-out infinite; }
+  .final-title {
+    font-size: 30px; font-weight: bold; color: #ffd54f;
+    text-shadow: 0 0 20px rgba(255,213,79,0.5);
+    margin: 15px 0;
+  }
+  .final-subtitle { font-size: 16px; color: #e1f5fe; margin-bottom: 30px; }
+
+  /* ========== 工具类 ========== */
+  .hidden { display: none !important; }
+
+  /* 响应式 - 小屏幕 */
+  @media (max-height: 650px) {
+    .elsa-face { font-size: 40px; }
+    .dialog-bubble { font-size: 14px; padding: 10px 14px; }
+    .flake-item { font-size: 28px; }
+    .plus-sign { font-size: 28px; }
+    .option-btn { width: 80px; height: 95px; }
+    .option-btn .num { font-size: 30px; }
+    .castle-emoji { font-size: 60px; }
+    .elsa-avatar { font-size: 80px; }
+    .game-title { font-size: 24px; }
+  }
+
+  /* 大屏幕优化 */
+  @media (min-width: 500px) {
+    .option-btn { width: 110px; height: 130px; }
+    .option-btn .num { font-size: 42px; }
+    .flake-item { font-size: 42px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 星空背景 -->
+<div class="stars" id="stars"></div>
+
+<!-- 飘雪背景 -->
+<div class="snow-bg" id="snowBg"></div>
+
+<!-- 庆祝特效层 -->
+<div class="celebration" id="celebration"></div>
+
+<!-- 主应用 -->
+<div id="app">
+
+  <!-- ===== 开始页面 ===== -->
+  <div id="start-screen">
+    <div class="castle-emoji">🏰</div>
+    <div class="elsa-avatar">👸</div>
+    <div class="game-title">艾莎的<br>魔法数字王国</div>
+    <div class="game-subtitle">和艾莎公主一起数雪花吧 ❄️</div>
+    <button class="start-btn" onclick="startGame()">✨ 开始冒险 ✨</button>
+  </div>
+
+  <!-- ===== 游戏页面 ===== -->
+  <div id="game-screen">
+    <!-- 顶部栏 -->
+    <div class="top-bar">
+      <div class="level-badge" id="levelBadge">❄️ 第一关</div>
+      <div class="stars-bar" id="starsBar">
+        <span class="star-icon" data-idx="0">⭐</span>
+        <span class="star-icon" data-idx="1">⭐</span>
+        <span class="star-icon" data-idx="2">⭐</span>
+        <span class="star-icon" data-idx="3">⭐</span>
+        <span class="star-icon" data-idx="4">⭐</span>
+      </div>
+    </div>
+
+    <!-- 场景区域 -->
+    <div class="scene-area">
+      <!-- 艾莎对话 -->
+      <div class="elsa-dialog">
+        <div class="elsa-face">👸</div>
+        <div class="dialog-bubble" id="dialogText">帮艾莎数一数魔法雪花吧！</div>
+      </div>
+
+      <!-- 雪花展示 -->
+      <div class="snowflake-display" id="snowflakeDisplay">
+        <div class="flake-group" id="groupA"></div>
+        <div class="plus-sign">+</div>
+        <div class="flake-group" id="groupB"></div>
+      </div>
+
+      <!-- 计数提示 -->
+      <div class="count-display" id="countDisplay"></div>
+
+      <!-- 合并区域 -->
+      <div class="merge-area" id="mergeArea"></div>
+
+      <!-- 数一数按钮 -->
+      <button class="count-hint-btn" id="countHintBtn" onclick="startCounting()">👆 点雪花数一数</button>
+    </div>
+
+    <!-- 选项区域 -->
+    <div class="options-area" id="optionsArea"></div>
+  </div>
+
+  <!-- ===== 关卡完成页面 ===== -->
+  <div id="level-complete">
+    <div class="complete-emoji">🎉</div>
+    <div class="complete-title" id="completeTitle">太棒了！</div>
+    <div class="complete-subtitle" id="completeSubtitle">你帮艾莎数完了所有雪花！</div>
+    <div class="complete-stars" id="completeStars"></div>
+    <button class="next-btn" id="nextLevelBtn" onclick="nextLevel()">继续冒险 🏰</button>
+    <br>
+    <button class="next-btn replay" onclick="replayLevel()">再玩一次 🔄</button>
+  </div>
+
+  <!-- ===== 全部完成页面 ===== -->
+  <div id="all-complete">
+    <div class="crown">👑</div>
+    <div class="final-title">你是最棒的小公主！</div>
+    <div class="final-subtitle">艾莎为你感到骄傲 💙</div>
+    <div class="complete-stars">⭐⭐⭐⭐⭐</div>
+    <button class="next-btn replay" onclick="restartGame()">重新开始 ✨</button>
+  </div>
+
+</div>
+
+<!-- ========== 音效 (Web Audio API) ========== -->
+<script>
+// ===== 音效系统 =====
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playTone(freq, duration, type='sine', vol=0.15) {
+  ensureAudio();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function playCountSound(n) {
+  // 音阶: C D E F G A B C D
+  const notes = [523, 587, 659, 698, 784, 880, 988, 1047, 1175];
+  playTone(notes[n % notes.length], 0.25, 'sine', 0.12);
+}
+
+function playCorrectSound() {
+  ensureAudio();
+  setTimeout(() => playTone(523, 0.15, 'sine', 0.1), 0);
+  setTimeout(() => playTone(659, 0.15, 'sine', 0.1), 120);
+  setTimeout(() => playTone(784, 0.15, 'sine', 0.1), 240);
+  setTimeout(() => playTone(1047, 0.3, 'sine', 0.12), 360);
+}
+
+function playWrongSound() {
+  playTone(200, 0.3, 'triangle', 0.08);
+}
+
+function playStartSound() {
+  ensureAudio();
+  setTimeout(() => playTone(523, 0.2, 'sine', 0.08), 0);
+  setTimeout(() => playTone(659, 0.2, 'sine', 0.08), 150);
+  setTimeout(() => playTone(784, 0.3, 'sine', 0.1), 300);
+}
+
+function playMagicSound() {
+  ensureAudio();
+  for (let i = 0; i < 5; i++) {
+    setTimeout(() => playTone(800 + Math.random()*800, 0.2, 'sine', 0.05), i*80);
+  }
+}
+
+// ===== 游戏状态 =====
+const LEVELS = [
+  { name: '第一关', emoji: '❄️', pairs: [[1,1],[1,2],[2,1],[1,3],[2,2]], flakeEmoji: '❄️' },
+  { name: '第二关', emoji: '⭐', pairs: [[2,2],[2,3],[3,2],[3,1],[3,3]], flakeEmoji: '⛄' },
+  { name: '第三关', emoji: '🏰', pairs: [[3,3],[3,4],[4,3],[4,4],[4,5]], flakeEmoji: '💎' },
+];
+
+let currentLevel = 0;
+let currentQuestion = 0;
+let starsEarned = 0;
+let numA = 0, numB = 0, answer = 0;
+let countIndex = 0;
+let isCountingMode = false;
+let isAnimating = false;
+let canAnswer = false;
+
+// ===== 背景初始化 =====
+function initStars() {
+  const container = document.getElementById('stars');
+  for (let i = 0; i < 50; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    const size = Math.random() * 3 + 1;
+    star.style.width = size + 'px';
+    star.style.height = size + 'px';
+    star.style.left = Math.random() * 100 + '%';
+    star.style.top = Math.random() * 60 + '%';
+    star.style.animationDelay = Math.random() * 3 + 's';
+    star.style.animationDuration = (2 + Math.random() * 3) + 's';
+    container.appendChild(star);
+  }
+}
+
+function initSnow() {
+  const container = document.getElementById('snowBg');
+  const flakes = ['❄', '❅', '❆', '✦', '•'];
+  for (let i = 0; i < 25; i++) {
+    const p = document.createElement('div');
+    p.className = 'snow-particle';
+    p.textContent = flakes[Math.floor(Math.random() * flakes.length)];
+    p.style.left = Math.random() * 100 + '%';
+    p.style.fontSize = (8 + Math.random() * 14) + 'px';
+    p.style.animationDuration = (6 + Math.random() * 8) + 's';
+    p.style.animationDelay = Math.random() * 10 + 's';
+    container.appendChild(p);
+  }
+}
+
+// ===== 页面切换 =====
+function showScreen(id) {
+  ['start-screen', 'game-screen', 'level-complete', 'all-complete'].forEach(s => {
+    document.getElementById(s).style.display = 'none';
+  });
+  const el = document.getElementById(id);
+  if (id === 'game-screen') {
+    el.style.display = 'flex';
+  } else {
+    el.style.display = 'block';
+  }
+}
+
+// ===== 开始游戏 =====
+function startGame() {
+  playStartSound();
+  currentLevel = 0;
+  startLevel();
+}
+
+function restartGame() {
+  playStartSound();
+  currentLevel = 0;
+  startLevel();
+}
+
+function startLevel() {
+  currentQuestion = 0;
+  starsEarned = 0;
+  updateStarsBar();
+  updateLevelBadge();
+  showScreen('game-screen');
+  nextQuestion();
+}
+
+function updateLevelBadge() {
+  const level = LEVELS[currentLevel];
+  document.getElementById('levelBadge').textContent = level.emoji + ' ' + level.name;
+}
+
+function updateStarsBar() {
+  const stars = document.querySelectorAll('.star-icon');
+  stars.forEach((s, i) => {
+    if (i < starsEarned) {
+      s.classList.add('earned');
+    } else {
+      s.classList.remove('earned');
+    }
+  });
+}
+
+// ===== 出题 =====
+function nextQuestion() {
+  const level = LEVELS[currentLevel];
+  if (currentQuestion >= level.pairs.length) {
+    showLevelComplete();
+    return;
+  }
+
+  isAnimating = true;
+  canAnswer = false;
+  isCountingMode = false;
+  countIndex = 0;
+
+  const pair = level.pairs[currentQuestion];
+  numA = pair[0];
+  numB = pair[1];
+  answer = numA + numB;
+
+  // 设置对话
+  const dialogTexts = [
+    '帮艾莎数一数魔法雪花吧！',
+    '再来数一数～',
+    '这次有多少呢？',
+    '艾莎又变出雪花啦！',
+    '最后一题啦，加油！',
+  ];
+  document.getElementById('dialogText').textContent = dialogTexts[currentQuestion] || dialogTexts[0];
+
+  // 清空
+  document.getElementById('groupA').innerHTML = '';
+  document.getElementById('groupB').innerHTML = '';
+  document.getElementById('countDisplay').textContent = '';
+  document.getElementById('mergeArea').innerHTML = '';
+  document.getElementById('mergeArea').style.display = 'none';
+  document.getElementById('snowflakeDisplay').style.display = 'flex';
+  document.getElementById('countHintBtn').style.display = 'none';
+  document.getElementById('optionsArea').innerHTML = '';
+
+  const emoji = level.flakeEmoji;
+
+  // 逐个显示雪花 - 左组
+  for (let i = 0; i < numA; i++) {
+    const flake = document.createElement('span');
+    flake.className = 'flake-item';
+    flake.textContent = emoji;
+    flake.dataset.index = i;
+    document.getElementById('groupA').appendChild(flake);
+    setTimeout(() => {
+      flake.classList.add('show');
+      playTone(400 + i * 80, 0.15, 'sine', 0.06);
+    }, 300 + i * 300);
+  }
+
+  // 逐个显示雪花 - 右组
+  for (let i = 0; i < numB; i++) {
+    const flake = document.createElement('span');
+    flake.className = 'flake-item';
+    flake.textContent = emoji;
+    flake.dataset.index = numA + i;
+    document.getElementById('groupB').appendChild(flake);
+    setTimeout(() => {
+      flake.classList.add('show');
+      playTone(400 + (numA + i) * 80, 0.15, 'sine', 0.06);
+    }, 300 + numA * 300 + 200 + i * 300);
+  }
+
+  // 全部显示完后，展示"数一数"按钮和选项
+  const totalDelay = 300 + (numA + numB) * 300 + 500;
+  setTimeout(() => {
+    document.getElementById('countHintBtn').style.display = 'block';
+    showOptions();
+    isAnimating = false;
+    canAnswer = true;
+  }, totalDelay);
+}
+
+// ===== 数一数功能 =====
+function startCounting() {
+  if (isCountingMode) return;
+  isCountingMode = true;
+  countIndex = 0;
+  document.getElementById('countHintBtn').style.display = 'none';
+
+  // 合并雪花到一起
+  const level = LEVELS[currentLevel];
+  const emoji = level.flakeEmoji;
+  const mergeArea = document.getElementById('mergeArea');
+  mergeArea.innerHTML = '';
+  mergeArea.style.display = 'flex';
+  document.getElementById('snowflakeDisplay').style.display = 'none';
+
+  for (let i = 0; i < answer; i++) {
+    const flake = document.createElement('span');
+    flake.className = 'flake-item show';
+    flake.textContent = emoji;
+    flake.dataset.countIdx = i;
+    flake.style.opacity = '0.4';
+    flake.addEventListener('click', () => countFlake(i));
+    mergeArea.appendChild(flake);
+  }
+
+  document.getElementById('countDisplay').textContent = '👆 点一朵，数一朵！';
+}
+
+function countFlake(idx) {
+  if (idx !== countIndex) return; // 必须按顺序点
+  const mergeArea = document.getElementById('mergeArea');
+  const flake = mergeArea.children[idx];
+  flake.style.opacity = '1';
+  flake.classList.add('counted');
+  countIndex++;
+  playCountSound(countIndex - 1);
+
+  document.getElementById('countDisplay').textContent = '数到了 ' + countIndex + ' ！';
+
+  if (countIndex >= answer) {
+    document.getElementById('countDisplay').textContent = '一共 ' + answer + ' 个！太棒了！🎉';
+    // 高亮正确答案
+    setTimeout(() => {
+      const btns = document.querySelectorAll('.option-btn');
+      btns.forEach(b => {
+        if (parseInt(b.dataset.value) === answer) {
+          b.style.border = '3px solid #ffd54f';
+          b.style.boxShadow = '0 0 20px rgba(255,213,79,0.5)';
+        }
+      });
+    }, 500);
+  }
+}
+
+// ===== 选项 =====
+function showOptions() {
+  const optionsArea = document.getElementById('optionsArea');
+  optionsArea.innerHTML = '';
+
+  const level = LEVELS[currentLevel];
+  const emoji = level.flakeEmoji;
+
+  // 生成干扰项
+  let options = [answer];
+  const makeDistractor = () => {
+    let d;
+    do {
+      d = answer + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 2) + 1);
+    } while (d < 1 || d > 10 || options.includes(d));
+    return d;
+  };
+  options.push(makeDistractor());
+  options.push(makeDistractor());
+
+  // 打乱顺序
+  options.sort(() => Math.random() - 0.5);
+
+  options.forEach(val => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.dataset.value = val;
+
+    const numSpan = document.createElement('div');
+    numSpan.className = 'num';
+    numSpan.textContent = val;
+
+    const miniFlakes = document.createElement('div');
+    miniFlakes.className = 'mini-flakes';
+    miniFlakes.textContent = emoji.repeat(val);
+
+    btn.appendChild(numSpan);
+    btn.appendChild(miniFlakes);
+    btn.addEventListener('click', () => checkAnswer(val, btn));
+    optionsArea.appendChild(btn);
+  });
+}
+
+// ===== 检查答案 =====
+function checkAnswer(val, btn) {
+  if (!canAnswer || isAnimating) return;
+
+  if (val === answer) {
+    // 正确！
+    canAnswer = false;
+    btn.classList.add('correct-flash');
+    playCorrectSound();
+    starsEarned++;
+    updateStarsBar();
+
+    // 对话更新
+    const praises = ['太棒了！你真聪明！✨', '哇！答对啦！💙', '小公主真厉害！👏', '艾莎为你鼓掌！🎉', '完美！太了不起了！🌟'];
+    document.getElementById('dialogText').textContent = praises[currentQuestion] || praises[0];
+
+    // 魔法粒子特效
+    createMagicBurst(btn);
+
+    // 进入下一题
+    setTimeout(() => {
+      currentQuestion++;
+      nextQuestion();
+    }, 1500);
+  } else {
+    // 答错 - 温柔引导
+    btn.classList.add('wrong-flash');
+    playWrongSound();
+    setTimeout(() => btn.classList.remove('wrong-flash'), 400);
+
+    const encourages = ['再数一数呀～💙', '没关系，再试试！', '仔细数数看～❄️'];
+    document.getElementById('dialogText').textContent = encourages[Math.floor(Math.random() * encourages.length)];
+
+    // 如果还没进入数一数模式，显示按钮
+    if (!isCountingMode) {
+      document.getElementById('countHintBtn').style.display = 'block';
+    }
+  }
+}
+
+// ===== 魔法粒子特效 =====
+function createMagicBurst(el) {
+  const rect = el.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+
+  for (let i = 0; i < 15; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'magic-particle';
+    const size = 4 + Math.random() * 8;
+    const angle = (Math.PI * 2 * i) / 15;
+    const dist = 40 + Math.random() * 60;
+    const tx = Math.cos(angle) * dist;
+    const ty = Math.sin(angle) * dist;
+
+    const colors = ['#64b5f6', '#ce93d8', '#ffd54f', '#80deea', '#fff'];
+    particle.style.cssText = `
+      left: ${cx}px; top: ${cy}px;
+      width: ${size}px; height: ${size}px;
+      background: ${colors[i % colors.length]};
+      --tx: ${tx}px; --ty: ${ty}px;
+      animation-delay: ${i * 30}ms;
+    `;
+    document.body.appendChild(particle);
+    setTimeout(() => particle.remove(), 1200);
+  }
+}
+
+// ===== 庆祝纸屑 =====
+function launchCelebration() {
+  const container = document.getElementById('celebration');
+  container.innerHTML = '';
+  container.classList.add('active');
+
+  const colors = ['#64b5f6', '#ce93d8', '#ffd54f', '#80deea', '#ef5350', '#66bb6a', '#ff8a65'];
+  for (let i = 0; i < 50; i++) {
+    const confetti = document.createElement('div');
+    confetti.className = 'confetti';
+    confetti.style.left = Math.random() * 100 + '%';
+    confetti.style.top = '-10px';
+    confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+    confetti.style.animationDelay = Math.random() * 0.8 + 's';
+    confetti.style.animationDuration = (1 + Math.random() * 1.5) + 's';
+    const w = 6 + Math.random() * 10;
+    confetti.style.width = w + 'px';
+    confetti.style.height = (w * 0.6) + 'px';
+    container.appendChild(confetti);
+  }
+  playMagicSound();
+  setTimeout(() => {
+    container.classList.remove('active');
+    container.innerHTML = '';
+  }, 3000);
+}
+
+// ===== 关卡完成 =====
+function showLevelComplete() {
+  launchCelebration();
+  playCorrectSound();
+
+  const level = LEVELS[currentLevel];
+  document.getElementById('completeTitle').textContent =
+    currentLevel < LEVELS.length - 1 ? level.name + ' 完成啦！' : '全部完成！';
+  document.getElementById('completeSubtitle').textContent =
+    '你获得了 ' + starsEarned + ' 颗星星！';
+  document.getElementById('completeStars').textContent = '⭐'.repeat(starsEarned);
+
+  if (currentLevel >= LEVELS.length - 1) {
+    showScreen('all-complete');
+  } else {
+    document.getElementById('nextLevelBtn').style.display = 'inline-block';
+    showScreen('level-complete');
+  }
+}
+
+function nextLevel() {
+  currentLevel++;
+  if (currentLevel >= LEVELS.length) {
+    showScreen('all-complete');
+  } else {
+    startLevel();
+  }
+}
+
+function replayLevel() {
+  startLevel();
+}
+
+// ===== 初始化 =====
+window.addEventListener('DOMContentLoaded', () => {
+  initStars();
+  initSnow();
+});
+
+// 防止页面滚动弹跳
+document.body.addEventListener('touchmove', e => {
+  e.preventDefault();
+}, { passive: false });
+</script>
+
+</body>
+</html>
