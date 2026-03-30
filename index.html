@@ -865,36 +865,70 @@ function initTTS() {
   if (!window.speechSynthesis) return;
   const loadVoices = () => {
     const voices = speechSynthesis.getVoices();
-    // 优先选中文女声
-    ttsVoice = voices.find(v => v.lang.startsWith('zh') && v.name.includes('Female')) ||
-               voices.find(v => v.lang.startsWith('zh') && (v.name.includes('Ting') || v.name.includes('Li') || v.name.includes('Mei'))) ||
-               voices.find(v => v.lang.startsWith('zh-CN')) ||
-               voices.find(v => v.lang.startsWith('zh')) ||
-               null;
+    if (voices.length === 0) return;
+    // 优先选最甜美的中文女声
+    // iOS/macOS: Ting-Ting(听听), Meijia(美佳) 
+    // Android: zh-CN female
+    // Windows: Huihui, Yaoyao
+    // 按优先级排序
+    const preferred = ['Xiaoxiao', 'Xiaoyi', 'Meijia', 'Ting-Ting', 'TingTing',
+                       'Yaoyao', 'Huihui', 'Lili', 'Female', 'female'];
+    for (const name of preferred) {
+      const found = voices.find(v => v.lang.startsWith('zh') && v.name.includes(name));
+      if (found) { ttsVoice = found; break; }
+    }
+    // 兜底：任何中文声音
+    if (!ttsVoice) {
+      ttsVoice = voices.find(v => v.lang === 'zh-CN') ||
+                 voices.find(v => v.lang.startsWith('zh')) || null;
+    }
     ttsReady = true;
   };
   loadVoices();
   if (speechSynthesis.onvoiceschanged !== undefined) {
     speechSynthesis.onvoiceschanged = loadVoices;
   }
+  // 有些浏览器需要延迟加载
+  setTimeout(loadVoices, 500);
 }
 
+// 核心：说完再回调，确保语音和动画同步
 function elsaSpeak(text, callback) {
-  if (!window.speechSynthesis || !ttsReady) {
-    if (callback) setTimeout(callback, 500);
+  if (!window.speechSynthesis) {
+    if (callback) setTimeout(callback, 800);
     return;
   }
   // 取消之前正在说的
   speechSynthesis.cancel();
+
   const utterance = new SpeechSynthesisUtterance(text);
   if (ttsVoice) utterance.voice = ttsVoice;
   utterance.lang = 'zh-CN';
-  utterance.rate = 0.85;  // 慢一点，适合小朋友
-  utterance.pitch = 1.3;  // 高一点，更可爱
+  utterance.rate = 0.8;   // 再慢一点，更清晰
+  utterance.pitch = 1.4;  // 高一些，甜美童声感
   utterance.volume = 1.0;
-  if (callback) {
-    utterance.onend = callback;
-  }
+
+  // 超时保护：如果语音引擎卡住了，5秒后强制回调
+  let done = false;
+  const safetyTimer = setTimeout(() => {
+    if (!done && callback) { done = true; callback(); }
+  }, Math.max(text.length * 350, 2000));
+
+  utterance.onend = () => {
+    if (!done) {
+      done = true;
+      clearTimeout(safetyTimer);
+      if (callback) setTimeout(callback, 200); // 小停顿再继续
+    }
+  };
+  utterance.onerror = () => {
+    if (!done) {
+      done = true;
+      clearTimeout(safetyTimer);
+      if (callback) setTimeout(callback, 200);
+    }
+  };
+
   speechSynthesis.speak(utterance);
 }
 
@@ -945,58 +979,74 @@ function playPianoNote(freq, startTime, duration, vol=0.07) {
   bgmNodes.push(osc1, osc2, gain, gain2);
 }
 
-// Let It Go 副歌旋律音符序列
-// "Let it go, let it go, can't hold it back anymore..."
-// 用简谱音符频率表示，基于 Ab 大调简化版
+// Let It Go 副歌旋律 — Ab 大调原曲精确版
 function getLetItGoMelody() {
-  // 音符频率映射 (第4-5八度)
+  // Ab 大调音符频率 (4-5八度)
   const N = {
-    'C4': 261.63, 'D4': 293.66, 'Eb4': 311.13, 'E4': 329.63,
-    'F4': 349.23, 'G4': 392.00, 'Ab4': 415.30, 'A4': 440.00,
-    'Bb4': 466.16, 'B4': 493.88,
-    'C5': 523.25, 'Db5': 554.37, 'D5': 587.33, 'Eb5': 622.25,
-    'E5': 659.25, 'F5': 698.46, 'G5': 783.99, 'Ab5': 830.61,
-    'R': 0 // 休止符
+    'Ab3': 207.65, 'Bb3': 233.08, 'C4': 261.63, 'Db4': 277.18,
+    'Eb4': 311.13, 'F4': 349.23, 'G4': 392.00,
+    'Ab4': 415.30, 'Bb4': 466.16, 'C5': 523.25, 'Db5': 554.37,
+    'Eb5': 622.25, 'F5': 698.46, 'G5': 783.99, 'Ab5': 830.61,
+    'R': 0
   };
 
-  const BPM = 72;
-  const beat = 60 / BPM; // 一拍的秒数
+  // 68 BPM, 4/4 拍, 偏慢抒情
+  const BPM = 68;
+  const q = 60 / BPM;       // 四分音符
+  const e = q / 2;           // 八分音符
+  const h = q * 2;           // 二分音符
+  const dq = q * 1.5;        // 附点四分
+  const w = q * 4;            // 全音符
 
-  // [音符, 持续拍数] — Let It Go 副歌旋律简化版
+  // Let It Go 副歌 — 精确简谱还原
+  // "Let it go, let it go, can't hold it back anymore"
+  // "Let it go, let it go, turn away and slam the door"
   const melody = [
-    // "Let it go, let it go"
-    ['Ab4', 1], ['Bb4', 1], ['C5', 1.5], ['R', 0.5],
-    ['Ab4', 1], ['Bb4', 0.5], ['C5', 0.5], ['C5', 1], ['R', 1],
-    // "Can't hold it back anymore"
-    ['Ab4', 1], ['Bb4', 1], ['C5', 1], ['C5', 0.5], ['Bb4', 0.5],
-    ['Ab4', 1], ['Ab4', 0.5], ['R', 0.5],
-    // "Let it go, let it go"
-    ['Ab4', 1], ['Bb4', 1], ['C5', 1.5], ['R', 0.5],
-    ['Eb5', 1], ['Db5', 0.5], ['C5', 0.5], ['C5', 1], ['R', 1],
-    // "Turn away and slam the door"
-    ['Ab4', 1], ['Bb4', 1], ['C5', 1], ['C5', 0.5], ['Bb4', 0.5],
-    ['Ab4', 1.5], ['R', 1.5],
+    // 前奏琶音 (Ab大调)
+    ['Ab3', e], ['Eb4', e], ['Ab4', e], ['Eb4', e],
+    ['Ab3', e], ['Eb4', e], ['Ab4', e], ['Eb4', e],
 
-    // 间奏 — 轻柔的琶音过渡
-    ['Eb4', 0.5], ['Ab4', 0.5], ['C5', 0.5], ['Eb5', 0.5],
-    ['C5', 0.5], ['Ab4', 0.5], ['Eb4', 0.5], ['R', 0.5],
+    // "Let it go" (Ab Bb C-)
+    ['Ab4', q], ['Bb4', q], ['C5', h],
+    // "let it go" (Ab Bb Db C-)
+    ['Ab4', q], ['Bb4', e], ['Db5', e], ['C5', h],
+    // "can't hold it back any-more"
+    ['Ab4', q], ['Bb4', q], ['C5', q], ['C5', e], ['Bb4', e],
+    ['Ab4', q], ['R', q],
+
+    // "Let it go" (Ab Bb C-)  
+    ['Ab4', q], ['Bb4', q], ['C5', h],
+    // "let it go" (Eb Db C-)
+    ['Eb5', q], ['Db5', e], ['C5', e], ['C5', h],
+    // "turn a-way and slam the door"
+    ['Ab4', q], ['Bb4', q], ['C5', q], ['C5', e], ['Bb4', e],
+    ['Ab4', h], ['R', q],
+
+    // 间奏琶音
+    ['Eb4', e], ['Ab4', e], ['C5', e], ['Eb5', e],
+    ['C5', e], ['Ab4', e],
 
     // "I don't care what they're going to say"
-    ['C5', 1], ['C5', 0.5], ['Bb4', 0.5], ['Ab4', 1],
-    ['Bb4', 1], ['C5', 1.5], ['R', 0.5],
-    // "Let the storm rage on"
-    ['Eb5', 1.5], ['Db5', 0.5], ['C5', 1], ['Bb4', 1],
-    ['C5', 2], ['R', 1],
+    ['C5', q], ['C5', e], ['Bb4', e], ['Ab4', q],
+    ['Bb4', q], ['C5', dq], ['R', e],
 
-    // "The cold never bothered me anyway" (结尾渐弱)
-    ['Ab4', 1], ['Bb4', 0.5], ['C5', 0.5], ['C5', 1],
-    ['Bb4', 0.5], ['Ab4', 0.5], ['G4', 1],
-    ['Ab4', 2], ['R', 2],
+    // "Let the storm rage on"  (Eb5 Db5 C5 Bb4 C5-)
+    ['Eb5', dq], ['Db5', e], ['C5', q], ['Bb4', q],
+    ['C5', h], ['R', q],
+
+    // "The cold never bothered me anyway"
+    ['Ab4', q], ['Bb4', e], ['C5', e], ['C5', q],
+    ['Bb4', e], ['Ab4', e], ['G4', q],
+    ['Ab4', h], ['R', h],
+
+    // 尾声琶音渐弱
+    ['Eb4', e], ['Ab4', e], ['C5', e], ['Eb5', e],
+    ['Ab5', q], ['R', h],
   ];
 
   return melody.map(([note, dur]) => ({
     freq: N[note],
-    duration: dur * beat
+    duration: dur
   }));
 }
 
@@ -1252,8 +1302,7 @@ function nextQuestion() {
   document.getElementById('optionsArea').innerHTML = '';
 
   // 重置算式
-  const formulaDisp = document.getElementById('formulaDisplay');
-  formulaDisp.classList.remove('show');
+  document.getElementById('formulaDisplay').classList.remove('show');
   document.getElementById('formulaA').textContent = '';
   document.getElementById('formulaA').classList.remove('show');
   document.getElementById('formulaPlus').classList.remove('show');
@@ -1264,90 +1313,81 @@ function nextQuestion() {
   document.getElementById('formulaAnswer').classList.remove('show');
 
   const emoji = level.flakeEmoji;
-  let delay = 100;
+  const itemName = emoji === '❄️' ? '雪花' : emoji === '⛄' ? '雪人' : emoji === '✨' ? '星星' : emoji === '🌸' ? '花朵' : '宝石';
 
-  // === 第1步：艾莎说"来看看" ===
-  const openLines = [
-    '小公主，来看看！',
-    '艾莎要变魔法啦！',
-    '准备好了吗？看这里！',
-    '这次的魔法题来啦！',
-    '最后一题，加油呀！',
-  ];
-  const openLine = openLines[currentQuestion] || openLines[0];
+  // ====== 串行流程：等语音说完再下一步 ======
+
+  // 第1步：开场语
+  const openLines = ['小公主，来看看！', '艾莎要变魔法啦！', '准备好了吗？', '新的题来啦！',
+                     '再来一题！', '继续加油！', '这次试试看！', '来看这个！', '又有新题啦！', '加油呀！'];
+  const openLine = openLines[currentQuestion % openLines.length];
   document.getElementById('dialogText').textContent = openLine;
-  elsaSpeak(openLine);
 
-  delay += 1200;
+  elsaSpeak(openLine, () => {
+    // 第2步：左组雪花逐个出现
+    showFlakesSequentially('groupA', numA, emoji, () => {
+      // 第3步：说左边数量
+      const txtA = '这边有' + numToChinese(numA) + '个' + itemName;
+      document.getElementById('dialogText').textContent = '这边有 ' + numA + ' 个！';
+      document.getElementById('formulaDisplay').classList.add('show');
+      document.getElementById('formulaA').textContent = numA;
+      document.getElementById('formulaA').classList.add('show');
 
-  // === 第2步：左组雪花逐个出现 + 语音说数量 ===
-  for (let i = 0; i < numA; i++) {
+      elsaSpeak(txtA, () => {
+        // 第4步：右组雪花逐个出现
+        showFlakesSequentially('groupB', numB, emoji, () => {
+          // 第5步：说右边数量
+          const txtB = '这边有' + numToChinese(numB) + '个' + itemName;
+          document.getElementById('dialogText').textContent = '这边有 ' + numB + ' 个！';
+          document.getElementById('formulaPlus').classList.add('show');
+          document.getElementById('formulaB').textContent = numB;
+          document.getElementById('formulaB').classList.add('show');
+
+          elsaSpeak(txtB, () => {
+            // 第6步：提出加法问题
+            document.getElementById('dialogText').textContent = numA + ' + ' + numB + ' = ？';
+            document.getElementById('formulaEquals').classList.add('show');
+            document.getElementById('formulaAnswer').textContent = '?';
+            document.getElementById('formulaAnswer').classList.add('show');
+
+            elsaSpeak(numToChinese(numA) + '加' + numToChinese(numB) + '，等于几呢？', () => {
+              // 第7步：显示选项
+              document.getElementById('countHintBtn').style.display = 'block';
+              document.getElementById('countDisplay').textContent = '👆 不确定就点雪花数一数';
+              showOptions();
+              isAnimating = false;
+              canAnswer = true;
+            });
+          });
+        });
+      });
+    });
+  });
+}
+
+// 逐个显示雪花（带动画间隔），完成后回调
+function showFlakesSequentially(groupId, count, emoji, callback) {
+  const group = document.getElementById(groupId);
+  const flakes = [];
+  for (let i = 0; i < count; i++) {
     const flake = document.createElement('span');
     flake.className = 'flake-item';
     flake.textContent = emoji;
-    document.getElementById('groupA').appendChild(flake);
-    setTimeout(() => {
-      flake.classList.add('show');
-      playTone(400 + i * 80, 0.15, 'sine', 0.06);
-    }, delay + i * 350);
+    group.appendChild(flake);
+    flakes.push(flake);
   }
-  delay += numA * 350 + 200;
-
-  // 说出左边数量 + 显示算式数字
-  setTimeout(() => {
-    const txt = numToChinese(numA) + '个' + (level.flakeEmoji === '❄️' ? '雪花' : level.flakeEmoji === '⛄' ? '雪人' : '钻石');
-    document.getElementById('dialogText').textContent = '这边有 ' + numA + ' 个！';
-    elsaSpeak('这边有' + txt);
-    // 显示算式第一个数
-    document.getElementById('formulaDisplay').classList.add('show');
-    document.getElementById('formulaA').textContent = numA;
-    document.getElementById('formulaA').classList.add('show');
-  }, delay);
-  delay += 1200;
-
-  // === 第3步：右组雪花逐个出现 ===
-  for (let i = 0; i < numB; i++) {
-    const flake = document.createElement('span');
-    flake.className = 'flake-item';
-    flake.textContent = emoji;
-    document.getElementById('groupB').appendChild(flake);
-    setTimeout(() => {
-      flake.classList.add('show');
-      playTone(400 + (numA + i) * 80, 0.15, 'sine', 0.06);
-    }, delay + i * 350);
+  let idx = 0;
+  function showNext() {
+    if (idx >= flakes.length) {
+      setTimeout(callback, 200);
+      return;
+    }
+    flakes[idx].classList.add('show');
+    playTone(400 + idx * 80, 0.15, 'sine', 0.06);
+    idx++;
+    setTimeout(showNext, 300);
   }
-  delay += numB * 350 + 200;
-
-  // 说出右边数量 + 显示加号和第二个数
-  setTimeout(() => {
-    const txt2 = numToChinese(numB) + '个' + (level.flakeEmoji === '❄️' ? '雪花' : level.flakeEmoji === '⛄' ? '雪人' : '钻石');
-    document.getElementById('dialogText').textContent = '这边有 ' + numB + ' 个！';
-    elsaSpeak('这边有' + txt2);
-    document.getElementById('formulaPlus').classList.add('show');
-    document.getElementById('formulaB').textContent = numB;
-    document.getElementById('formulaB').classList.add('show');
-  }, delay);
-  delay += 1200;
-
-  // === 第4步：提出加法问题 ===
-  setTimeout(() => {
-    const question = numA + ' 加 ' + numB + ' 等于几呢？';
-    document.getElementById('dialogText').textContent = numA + ' + ' + numB + ' = ？';
-    elsaSpeak(numToChinese(numA) + '加' + numToChinese(numB) + '等于几呢？');
-    document.getElementById('formulaEquals').classList.add('show');
-    document.getElementById('formulaAnswer').textContent = '?';
-    document.getElementById('formulaAnswer').classList.add('show');
-  }, delay);
-  delay += 1500;
-
-  // === 第5步：显示选项和"数一数"按钮 ===
-  setTimeout(() => {
-    document.getElementById('countHintBtn').style.display = 'block';
-    document.getElementById('countDisplay').textContent = '👆 不确定的话，点雪花数一数';
-    showOptions();
-    isAnimating = false;
-    canAnswer = true;
-  }, delay);
+  setTimeout(showNext, 150);
 }
 
 // ===== 数一数功能 =====
@@ -1486,17 +1526,17 @@ function checkAnswer(val, btn) {
 
     // 艾莎语音说出完整公式 + 鼓励
     const praises = ['太棒了！', '你真聪明！', '小公主真厉害！', '太了不起了！', '完美！'];
-    const praise = praises[currentQuestion] || praises[0];
-    elsaSpeak(numToChinese(numA) + '加' + numToChinese(numB) + '等于' + numToChinese(answer) + '！' + praise);
+    const praise = praises[currentQuestion % praises.length];
+    elsaSpeak(numToChinese(numA) + '加' + numToChinese(numB) + '等于' + numToChinese(answer) + '！' + praise, () => {
+      // 等语音说完再进入下一题
+      setTimeout(() => {
+        currentQuestion++;
+        nextQuestion();
+      }, 500);
+    });
 
     // 魔法粒子特效
     createMagicBurst(btn);
-
-    // 进入下一题（多等一会让语音说完）
-    setTimeout(() => {
-      currentQuestion++;
-      nextQuestion();
-    }, 2500);
   } else {
     // 答错 - 温柔引导 + 语音鼓励
     btn.classList.add('wrong-flash');
