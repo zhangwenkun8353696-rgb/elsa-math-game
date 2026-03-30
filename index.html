@@ -159,8 +159,9 @@
   }
   .stars-bar {
     display: flex;
-    gap: 4px;
-    font-size: 22px;
+    gap: 2px;
+    font-size: 18px;
+    flex-wrap: nowrap;
   }
   .star-icon {
     transition: all 0.3s;
@@ -577,7 +578,12 @@
     text-align: center;
     animation: fadeIn 0.8s ease-out;
     width: 100%;
+    height: 100%;
     padding: 0 20px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-top: max(15px, env(safe-area-inset-top));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
   }
   .select-title {
     font-size: 26px;
@@ -719,32 +725,7 @@
     <div class="elsa-avatar" style="font-size:70px;margin-bottom:5px">👸</div>
     <div class="select-title">选择关卡</div>
     <div class="select-subtitle">小公主想挑战哪一关呢？</div>
-    <div class="level-cards">
-      <div class="level-card card-1" onclick="selectLevel(0)">
-        <div class="level-card-icon">❄️</div>
-        <div class="level-card-info">
-          <div class="level-card-name">第一关 · 雪花</div>
-          <div class="level-card-desc">简单加法，答案不超过 4</div>
-        </div>
-        <div class="level-card-arrow">›</div>
-      </div>
-      <div class="level-card card-2" onclick="selectLevel(1)">
-        <div class="level-card-icon">⛄</div>
-        <div class="level-card-info">
-          <div class="level-card-name">第二关 · 雪人</div>
-          <div class="level-card-desc">进阶挑战，答案不超过 6</div>
-        </div>
-        <div class="level-card-arrow">›</div>
-      </div>
-      <div class="level-card card-3" onclick="selectLevel(2)">
-        <div class="level-card-icon">💎</div>
-        <div class="level-card-info">
-          <div class="level-card-name">第三关 · 钻石</div>
-          <div class="level-card-desc">高级挑战，答案不超过 9</div>
-        </div>
-        <div class="level-card-arrow">›</div>
-      </div>
-    </div>
+    <div class="level-cards" id="levelCards"></div>
     <button class="back-btn" onclick="showScreen('start-screen')">← 返回首页</button>
   </div>
 
@@ -753,13 +734,7 @@
     <!-- 顶部栏 -->
     <div class="top-bar">
       <div class="level-badge" id="levelBadge" onclick="showScreen('level-select')" style="cursor:pointer">❄️ 第一关</div>
-      <div class="stars-bar" id="starsBar">
-        <span class="star-icon" data-idx="0">⭐</span>
-        <span class="star-icon" data-idx="1">⭐</span>
-        <span class="star-icon" data-idx="2">⭐</span>
-        <span class="star-icon" data-idx="3">⭐</span>
-        <span class="star-icon" data-idx="4">⭐</span>
-      </div>
+      <div class="stars-bar" id="starsBar"></div>
     </div>
 
     <!-- 场景区域 -->
@@ -1083,9 +1058,36 @@ function toggleMusic() {
 
 // ===== 游戏状态 =====
 const LEVELS = [
-  { name: '第一关', emoji: '❄️', pairs: [[1,1],[1,2],[2,1],[1,3],[2,2]], flakeEmoji: '❄️' },
-  { name: '第二关', emoji: '⭐', pairs: [[2,2],[2,3],[3,2],[3,1],[3,3]], flakeEmoji: '⛄' },
-  { name: '第三关', emoji: '🏰', pairs: [[3,3],[3,4],[4,3],[4,4],[4,5]], flakeEmoji: '💎' },
+  // 第1关：最简单，1+1到1+2，3题热身
+  { name: '第一关', emoji: '❄️', flakeEmoji: '❄️', desc: '初识加法',
+    pairs: [[1,1],[1,2],[2,1]] },
+  // 第2关：+1为主，3题
+  { name: '第二关', emoji: '⭐', flakeEmoji: '❄️', desc: '加1练习',
+    pairs: [[2,1],[1,3],[3,1]] },
+  // 第3关：结果不超过5，4题
+  { name: '第三关', emoji: '🌟', flakeEmoji: '⛄', desc: '凑到5',
+    pairs: [[2,2],[1,4],[3,2],[2,3]] },
+  // 第4关：结果不超过5巩固，4题
+  { name: '第四关', emoji: '🦌', flakeEmoji: '⛄', desc: '5以内巩固',
+    pairs: [[4,1],[1,3],[2,3],[3,2]] },
+  // 第5关：结果5-6，4题
+  { name: '第五关', emoji: '🏰', flakeEmoji: '💎', desc: '挑战6',
+    pairs: [[3,3],[2,4],[4,2],[1,5]] },
+  // 第6关：结果5-7，5题
+  { name: '第六关', emoji: '💎', flakeEmoji: '💎', desc: '到7啦',
+    pairs: [[3,4],[4,3],[2,5],[5,2],[1,6]] },
+  // 第7关：结果6-8，5题
+  { name: '第七关', emoji: '🌈', flakeEmoji: '✨', desc: '越来越棒',
+    pairs: [[4,4],[3,5],[5,3],[2,6],[4,3]] },
+  // 第8关：结果7-8，6题
+  { name: '第八关', emoji: '🎀', flakeEmoji: '✨', desc: '快到9了',
+    pairs: [[4,4],[3,5],[5,3],[4,3],[2,6],[6,2]] },
+  // 第9关：结果8-9，6题
+  { name: '第九关', emoji: '👑', flakeEmoji: '🌸', desc: '冲刺9',
+    pairs: [[4,5],[5,4],[3,6],[6,3],[5,3],[4,4]] },
+  // 第10关：全范围混合大挑战，7题
+  { name: '第十关', emoji: '🏆', flakeEmoji: '🌸', desc: '全能公主',
+    pairs: [[5,4],[3,6],[4,5],[6,3],[2,7],[5,3],[4,4]] },
 ];
 
 let currentLevel = 0;
@@ -1147,7 +1149,31 @@ function startGame() {
   playStartSound();
   // 开始播放 Let It Go 背景音乐
   if (!bgmPlaying) startBgm();
+  renderLevelCards();
   showScreen('level-select');
+}
+
+function renderLevelCards() {
+  const container = document.getElementById('levelCards');
+  container.innerHTML = '';
+  const colors = ['rgba(100,181,246,0.4)','rgba(255,213,79,0.4)','rgba(206,147,216,0.4)',
+                  'rgba(129,199,132,0.4)','rgba(255,138,101,0.4)','rgba(100,181,246,0.4)',
+                  'rgba(255,213,79,0.4)','rgba(206,147,216,0.4)','rgba(129,199,132,0.4)','rgba(255,138,101,0.4)'];
+  LEVELS.forEach((level, idx) => {
+    const card = document.createElement('div');
+    card.className = 'level-card';
+    card.style.borderColor = colors[idx % colors.length];
+    card.onclick = () => selectLevel(idx);
+    card.innerHTML = `
+      <div class="level-card-icon">${level.emoji}</div>
+      <div class="level-card-info">
+        <div class="level-card-name">${level.name} · ${level.desc}</div>
+        <div class="level-card-desc">${level.pairs.length}题</div>
+      </div>
+      <div class="level-card-arrow">›</div>
+    `;
+    container.appendChild(card);
+  });
 }
 
 function selectLevel(levelIdx) {
@@ -1157,12 +1183,24 @@ function selectLevel(levelIdx) {
 
 function restartGame() {
   playStartSound();
+  renderLevelCards();
   showScreen('level-select');
 }
 
 function startLevel() {
   currentQuestion = 0;
   starsEarned = 0;
+  // 动态生成星星栏
+  const level = LEVELS[currentLevel];
+  const starsBar = document.getElementById('starsBar');
+  starsBar.innerHTML = '';
+  for (let i = 0; i < level.pairs.length; i++) {
+    const span = document.createElement('span');
+    span.className = 'star-icon';
+    span.dataset.idx = i;
+    span.textContent = '⭐';
+    starsBar.appendChild(span);
+  }
   updateStarsBar();
   updateLevelBadge();
   showScreen('game-screen');
@@ -1577,8 +1615,12 @@ window.addEventListener('DOMContentLoaded', () => {
   initTTS();
 });
 
-// 防止页面滚动弹跳
+// 防止页面滚动弹跳（但允许关卡选择页面滚动）
 document.body.addEventListener('touchmove', e => {
+  const levelSelect = document.getElementById('level-select');
+  if (levelSelect && levelSelect.style.display !== 'none' && levelSelect.contains(e.target)) {
+    return; // 允许关卡选择页面滚动
+  }
   e.preventDefault();
 }, { passive: false });
 </script>
