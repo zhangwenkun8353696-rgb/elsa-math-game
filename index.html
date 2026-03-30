@@ -481,6 +481,37 @@
   }
   .final-subtitle { font-size: 16px; color: #e1f5fe; margin-bottom: 30px; }
 
+  /* ========== 音乐按钮 ========== */
+  .music-btn {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    top: max(12px, env(safe-area-inset-top));
+    z-index: 200;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+  }
+  .music-btn:active { transform: scale(0.9); }
+  .music-btn.playing {
+    animation: music-pulse 1.5s ease-in-out infinite;
+    border-color: rgba(100, 181, 246, 0.6);
+  }
+  @keyframes music-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(100,181,246,0.3); }
+    50% { box-shadow: 0 0 15px 5px rgba(100,181,246,0.2); }
+  }
+
   /* ========== 工具类 ========== */
   .hidden { display: none !important; }
 
@@ -515,6 +546,9 @@
 
 <!-- 庆祝特效层 -->
 <div class="celebration" id="celebration"></div>
+
+<!-- 音乐开关按钮 -->
+<button class="music-btn" id="musicBtn" onclick="toggleMusic()" title="音乐开关">🎵</button>
 
 <!-- 主应用 -->
 <div id="app">
@@ -649,6 +683,158 @@ function playMagicSound() {
   }
 }
 
+// ===== Let It Go 背景音乐 =====
+let bgmPlaying = false;
+let bgmTimer = null;
+let bgmNodes = [];
+
+// 钢琴音色合成（更柔和、有泛音）
+function playPianoNote(freq, startTime, duration, vol=0.07) {
+  ensureAudio();
+  // 基音
+  const osc1 = audioCtx.createOscillator();
+  const osc2 = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc1.type = 'sine';
+  osc1.frequency.value = freq;
+  // 轻微的泛音让音色更丰富
+  osc2.type = 'sine';
+  osc2.frequency.value = freq * 2;
+
+  const gain2 = audioCtx.createGain();
+  gain2.gain.value = 0.15; // 泛音很轻
+
+  osc1.connect(gain);
+  osc2.connect(gain2);
+  gain2.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  // 包络：快起慢落，模拟钢琴
+  gain.gain.setValueAtTime(0.001, startTime);
+  gain.gain.exponentialRampToValueAtTime(vol, startTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(vol * 0.6, startTime + duration * 0.3);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+  osc1.start(startTime);
+  osc1.stop(startTime + duration + 0.05);
+  osc2.start(startTime);
+  osc2.stop(startTime + duration + 0.05);
+
+  bgmNodes.push(osc1, osc2, gain, gain2);
+}
+
+// Let It Go 副歌旋律音符序列
+// "Let it go, let it go, can't hold it back anymore..."
+// 用简谱音符频率表示，基于 Ab 大调简化版
+function getLetItGoMelody() {
+  // 音符频率映射 (第4-5八度)
+  const N = {
+    'C4': 261.63, 'D4': 293.66, 'Eb4': 311.13, 'E4': 329.63,
+    'F4': 349.23, 'G4': 392.00, 'Ab4': 415.30, 'A4': 440.00,
+    'Bb4': 466.16, 'B4': 493.88,
+    'C5': 523.25, 'Db5': 554.37, 'D5': 587.33, 'Eb5': 622.25,
+    'E5': 659.25, 'F5': 698.46, 'G5': 783.99, 'Ab5': 830.61,
+    'R': 0 // 休止符
+  };
+
+  const BPM = 72;
+  const beat = 60 / BPM; // 一拍的秒数
+
+  // [音符, 持续拍数] — Let It Go 副歌旋律简化版
+  const melody = [
+    // "Let it go, let it go"
+    ['Ab4', 1], ['Bb4', 1], ['C5', 1.5], ['R', 0.5],
+    ['Ab4', 1], ['Bb4', 0.5], ['C5', 0.5], ['C5', 1], ['R', 1],
+    // "Can't hold it back anymore"
+    ['Ab4', 1], ['Bb4', 1], ['C5', 1], ['C5', 0.5], ['Bb4', 0.5],
+    ['Ab4', 1], ['Ab4', 0.5], ['R', 0.5],
+    // "Let it go, let it go"
+    ['Ab4', 1], ['Bb4', 1], ['C5', 1.5], ['R', 0.5],
+    ['Eb5', 1], ['Db5', 0.5], ['C5', 0.5], ['C5', 1], ['R', 1],
+    // "Turn away and slam the door"
+    ['Ab4', 1], ['Bb4', 1], ['C5', 1], ['C5', 0.5], ['Bb4', 0.5],
+    ['Ab4', 1.5], ['R', 1.5],
+
+    // 间奏 — 轻柔的琶音过渡
+    ['Eb4', 0.5], ['Ab4', 0.5], ['C5', 0.5], ['Eb5', 0.5],
+    ['C5', 0.5], ['Ab4', 0.5], ['Eb4', 0.5], ['R', 0.5],
+
+    // "I don't care what they're going to say"
+    ['C5', 1], ['C5', 0.5], ['Bb4', 0.5], ['Ab4', 1],
+    ['Bb4', 1], ['C5', 1.5], ['R', 0.5],
+    // "Let the storm rage on"
+    ['Eb5', 1.5], ['Db5', 0.5], ['C5', 1], ['Bb4', 1],
+    ['C5', 2], ['R', 1],
+
+    // "The cold never bothered me anyway" (结尾渐弱)
+    ['Ab4', 1], ['Bb4', 0.5], ['C5', 0.5], ['C5', 1],
+    ['Bb4', 0.5], ['Ab4', 0.5], ['G4', 1],
+    ['Ab4', 2], ['R', 2],
+  ];
+
+  return melody.map(([note, dur]) => ({
+    freq: N[note],
+    duration: dur * beat
+  }));
+}
+
+function playLetItGo() {
+  if (!bgmPlaying) return;
+  ensureAudio();
+  bgmNodes = [];
+
+  const melody = getLetItGoMelody();
+  let time = audioCtx.currentTime + 0.1;
+
+  melody.forEach(({ freq, duration }) => {
+    if (freq > 0) {
+      playPianoNote(freq, time, duration * 0.9, 0.06);
+    }
+    time += duration;
+  });
+
+  // 整首旋律的总时长
+  const totalDuration = melody.reduce((sum, n) => sum + n.duration, 0);
+
+  // 循环播放
+  bgmTimer = setTimeout(() => {
+    if (bgmPlaying) playLetItGo();
+  }, totalDuration * 1000 + 500);
+}
+
+function startBgm() {
+  if (bgmPlaying) return;
+  bgmPlaying = true;
+  document.getElementById('musicBtn').classList.add('playing');
+  document.getElementById('musicBtn').textContent = '🎶';
+  playLetItGo();
+}
+
+function stopBgm() {
+  bgmPlaying = false;
+  document.getElementById('musicBtn').classList.remove('playing');
+  document.getElementById('musicBtn').textContent = '🔇';
+  if (bgmTimer) {
+    clearTimeout(bgmTimer);
+    bgmTimer = null;
+  }
+  // 停止所有正在播放的音符
+  bgmNodes.forEach(node => {
+    try { node.disconnect(); } catch(e) {}
+  });
+  bgmNodes = [];
+}
+
+function toggleMusic() {
+  ensureAudio();
+  if (bgmPlaying) {
+    stopBgm();
+  } else {
+    startBgm();
+  }
+}
+
 // ===== 游戏状态 =====
 const LEVELS = [
   { name: '第一关', emoji: '❄️', pairs: [[1,1],[1,2],[2,1],[1,3],[2,2]], flakeEmoji: '❄️' },
@@ -715,6 +901,8 @@ function startGame() {
   playStartSound();
   currentLevel = 0;
   startLevel();
+  // 开始播放 Let It Go 背景音乐
+  if (!bgmPlaying) startBgm();
 }
 
 function restartGame() {
