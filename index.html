@@ -512,6 +512,99 @@
     50% { box-shadow: 0 0 15px 5px rgba(100,181,246,0.2); }
   }
 
+  /* ========== 关卡选择页面 ========== */
+  #level-select {
+    display: none;
+    text-align: center;
+    animation: fadeIn 0.8s ease-out;
+    width: 100%;
+    padding: 0 20px;
+  }
+  .select-title {
+    font-size: 26px;
+    font-weight: bold;
+    color: #e1f5fe;
+    text-shadow: 0 0 20px rgba(100, 181, 246, 0.8);
+    margin-bottom: 8px;
+  }
+  .select-subtitle {
+    font-size: 15px;
+    color: #b3e5fc;
+    margin-bottom: 25px;
+  }
+  .level-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-items: center;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+  .level-card {
+    width: 100%;
+    padding: 18px 20px;
+    border-radius: 22px;
+    border: 2.5px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(12px);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: all 0.3s;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  }
+  .level-card:active {
+    transform: scale(0.96);
+  }
+  .level-card:hover {
+    border-color: rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.12);
+  }
+  .level-card-icon {
+    font-size: 44px;
+    flex-shrink: 0;
+    width: 56px;
+    text-align: center;
+  }
+  .level-card-info {
+    text-align: left;
+    flex: 1;
+  }
+  .level-card-name {
+    font-size: 20px;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 4px;
+  }
+  .level-card-desc {
+    font-size: 13px;
+    color: #b3e5fc;
+    line-height: 1.4;
+  }
+  .level-card-arrow {
+    font-size: 22px;
+    color: rgba(255,255,255,0.4);
+    flex-shrink: 0;
+  }
+  .level-card.card-1 { border-color: rgba(100,181,246,0.4); }
+  .level-card.card-2 { border-color: rgba(255,213,79,0.4); }
+  .level-card.card-3 { border-color: rgba(206,147,216,0.4); }
+
+  .back-btn {
+    display: inline-block;
+    margin-top: 22px;
+    padding: 10px 30px;
+    font-size: 15px;
+    color: rgba(255,255,255,0.7);
+    background: transparent;
+    border: 1.5px solid rgba(255,255,255,0.2);
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .back-btn:active { transform: scale(0.95); opacity: 0.7; }
+
   /* ========== 工具类 ========== */
   .hidden { display: none !important; }
 
@@ -562,11 +655,45 @@
     <button class="start-btn" onclick="startGame()">✨ 开始冒险 ✨</button>
   </div>
 
+  <!-- ===== 关卡选择页面 ===== -->
+  <div id="level-select">
+    <div class="elsa-avatar" style="font-size:70px;margin-bottom:5px">👸</div>
+    <div class="select-title">选择关卡</div>
+    <div class="select-subtitle">小公主想挑战哪一关呢？</div>
+    <div class="level-cards">
+      <div class="level-card card-1" onclick="selectLevel(0)">
+        <div class="level-card-icon">❄️</div>
+        <div class="level-card-info">
+          <div class="level-card-name">第一关 · 雪花</div>
+          <div class="level-card-desc">简单加法，答案不超过 4</div>
+        </div>
+        <div class="level-card-arrow">›</div>
+      </div>
+      <div class="level-card card-2" onclick="selectLevel(1)">
+        <div class="level-card-icon">⛄</div>
+        <div class="level-card-info">
+          <div class="level-card-name">第二关 · 雪人</div>
+          <div class="level-card-desc">进阶挑战，答案不超过 6</div>
+        </div>
+        <div class="level-card-arrow">›</div>
+      </div>
+      <div class="level-card card-3" onclick="selectLevel(2)">
+        <div class="level-card-icon">💎</div>
+        <div class="level-card-info">
+          <div class="level-card-name">第三关 · 钻石</div>
+          <div class="level-card-desc">高级挑战，答案不超过 9</div>
+        </div>
+        <div class="level-card-arrow">›</div>
+      </div>
+    </div>
+    <button class="back-btn" onclick="showScreen('start-screen')">← 返回首页</button>
+  </div>
+
   <!-- ===== 游戏页面 ===== -->
   <div id="game-screen">
     <!-- 顶部栏 -->
     <div class="top-bar">
-      <div class="level-badge" id="levelBadge">❄️ 第一关</div>
+      <div class="level-badge" id="levelBadge" onclick="showScreen('level-select')" style="cursor:pointer">❄️ 第一关</div>
       <div class="stars-bar" id="starsBar">
         <span class="star-icon" data-idx="0">⭐</span>
         <span class="star-icon" data-idx="1">⭐</span>
@@ -614,6 +741,8 @@
     <button class="next-btn" id="nextLevelBtn" onclick="nextLevel()">继续冒险 🏰</button>
     <br>
     <button class="next-btn replay" onclick="replayLevel()">再玩一次 🔄</button>
+    <br>
+    <button class="back-btn" onclick="showScreen('level-select')" style="margin-top:12px">📋 选择关卡</button>
   </div>
 
   <!-- ===== 全部完成页面 ===== -->
@@ -623,6 +752,8 @@
     <div class="final-subtitle">艾莎为你感到骄傲 💙</div>
     <div class="complete-stars">⭐⭐⭐⭐⭐</div>
     <button class="next-btn replay" onclick="restartGame()">重新开始 ✨</button>
+    <br>
+    <button class="back-btn" onclick="showScreen('level-select')" style="margin-top:12px">📋 选择关卡</button>
   </div>
 
 </div>
@@ -885,7 +1016,7 @@ function initSnow() {
 
 // ===== 页面切换 =====
 function showScreen(id) {
-  ['start-screen', 'game-screen', 'level-complete', 'all-complete'].forEach(s => {
+  ['start-screen', 'level-select', 'game-screen', 'level-complete', 'all-complete'].forEach(s => {
     document.getElementById(s).style.display = 'none';
   });
   const el = document.getElementById(id);
@@ -899,16 +1030,19 @@ function showScreen(id) {
 // ===== 开始游戏 =====
 function startGame() {
   playStartSound();
-  currentLevel = 0;
-  startLevel();
   // 开始播放 Let It Go 背景音乐
   if (!bgmPlaying) startBgm();
+  showScreen('level-select');
+}
+
+function selectLevel(levelIdx) {
+  currentLevel = levelIdx;
+  startLevel();
 }
 
 function restartGame() {
   playStartSound();
-  currentLevel = 0;
-  startLevel();
+  showScreen('level-select');
 }
 
 function startLevel() {
