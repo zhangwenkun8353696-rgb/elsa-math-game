@@ -985,8 +985,69 @@ function checkTTSAvailable() {
 const ttsApiBase = 'https://textreadtts.com/tts/convert?accessKey=FREE&language=chinese&speaker=speaker1&text=';
 const audioCache = {}; // 缓存已获取的音频 URL
 
+// 预加载一条语音（只获取URL缓存，不播放）
+function preloadTTS(text) {
+  if (audioCache[text]) return Promise.resolve();
+  const shortText = text.substring(0, 38);
+  const url = ttsApiBase + encodeURIComponent(shortText);
+  return fetch(url).then(r => r.json()).then(data => {
+    if (data.code === 0 && data.audio) {
+      audioCache[text] = data.audio;
+    }
+  }).catch(() => {});
+}
+
+// 预加载本关所有需要的语音
+function preloadLevelAudio(levelIdx, cb) {
+  checkTTSAvailable();
+  if (ttsAvailable) { cb(); return; } // 原生 TTS 可用就不需要预加载
+
+  const level = LEVELS[levelIdx];
+  const emoji = level.flakeEmoji;
+  const itemNames = {
+    '❄️': '雪花', '⭐': '星星', '⛄': '雪人', '🦌': '小鹿', '🏰': '城堡',
+    '💎': '钻石', '🌈': '彩虹', '🎀': '蝴蝶结', '👑': '皇冠', '🏆': '奖杯'
+  };
+  const itemName = itemNames[emoji] || '宝贝';
+
+  // 收集本关需要的所有语音文本
+  const texts = new Set();
+
+  // 开场语
+  const openLines = ['小公主，来看看！', '艾莎要变魔法啦！', '准备好了吗？', '新的题来啦！',
+                     '再来一题！', '继续加油！', '这次试试看！', '来看这个！', '又有新题啦！', '加油呀！'];
+  level.pairs.forEach((_, i) => texts.add(openLines[i % openLines.length]));
+
+  // 数量语音
+  level.pairs.forEach(([a, b]) => {
+    texts.add('这边有' + numToChinese(a) + '个' + itemName);
+    texts.add('这边有' + numToChinese(b) + '个' + itemName);
+    texts.add(numToChinese(a) + '加' + numToChinese(b) + '，等于几呢？');
+    // 答对公式
+    const ans = a + b;
+    const praises = ['太棒了！', '你真聪明！', '小公主真厉害！', '太了不起了！', '完美！'];
+    texts.add(numToChinese(a) + '加' + numToChinese(b) + '等于' + numToChinese(ans) + '！' + praises[0]);
+  });
+
+  // 答错鼓励
+  texts.add('再想想呀，不着急！');
+  texts.add('没关系的，再试一次！');
+  texts.add('点雪花数一数就知道啦！');
+
+  // 显示加载提示
+  document.getElementById('dialogText').textContent = '艾莎正在准备中...✨';
+
+  // 批量预加载（串行，避免并发限制）
+  const textArr = Array.from(texts);
+  let idx = 0;
+  function loadNext() {
+    if (idx >= textArr.length) { cb(); return; }
+    preloadTTS(textArr[idx]).then(() => { idx++; loadNext(); });
+  }
+  loadNext();
+}
+
 function playOnlineTTS(text, callback) {
-  // 先查缓存
   if (audioCache[text]) {
     const audio = new Audio(audioCache[text]);
     audio.onended = () => { if (callback) setTimeout(callback, 150); };
@@ -995,7 +1056,7 @@ function playOnlineTTS(text, callback) {
     return;
   }
 
-  // 截断到40字符以内（免费API限制）
+  // 如果缓存未命中，实时请求
   const shortText = text.substring(0, 38);
   const url = ttsApiBase + encodeURIComponent(shortText);
 
@@ -1429,7 +1490,6 @@ function restartGame() {
 function startLevel() {
   currentQuestion = 0;
   starsEarned = 0;
-  // 动态生成星星栏
   const level = LEVELS[currentLevel];
   const starsBar = document.getElementById('starsBar');
   starsBar.innerHTML = '';
@@ -1443,7 +1503,13 @@ function startLevel() {
   updateStarsBar();
   updateLevelBadge();
   showScreen('game-screen');
-  nextQuestion();
+  document.getElementById('dialogText').textContent = '艾莎正在准备中...✨';
+  document.getElementById('optionsArea').innerHTML = '';
+
+  // 先预加载本关所有语音，加载完再出题
+  preloadLevelAudio(currentLevel, () => {
+    nextQuestion();
+  });
 }
 
 function updateLevelBadge() {
