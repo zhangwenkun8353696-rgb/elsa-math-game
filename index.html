@@ -909,6 +909,7 @@ function playMagicSound() {
 // ===== 艾莎语音系统 (TTS) =====
 let ttsVoice = null;
 let ttsReady = false;
+let ttsUnlocked = false;  // 手机端需要用户交互后才能使用
 
 function initTTS() {
   if (!window.speechSynthesis) return;
@@ -916,17 +917,12 @@ function initTTS() {
     const voices = speechSynthesis.getVoices();
     if (voices.length === 0) return;
     // 优先选最甜美的中文女声
-    // iOS/macOS: Ting-Ting(听听), Meijia(美佳) 
-    // Android: zh-CN female
-    // Windows: Huihui, Yaoyao
-    // 按优先级排序
     const preferred = ['Xiaoxiao', 'Xiaoyi', 'Meijia', 'Ting-Ting', 'TingTing',
                        'Yaoyao', 'Huihui', 'Lili', 'Female', 'female'];
     for (const name of preferred) {
       const found = voices.find(v => v.lang.startsWith('zh') && v.name.includes(name));
       if (found) { ttsVoice = found; break; }
     }
-    // 兜底：任何中文声音
     if (!ttsVoice) {
       ttsVoice = voices.find(v => v.lang === 'zh-CN') ||
                  voices.find(v => v.lang.startsWith('zh')) || null;
@@ -937,48 +933,90 @@ function initTTS() {
   if (speechSynthesis.onvoiceschanged !== undefined) {
     speechSynthesis.onvoiceschanged = loadVoices;
   }
-  // 有些浏览器需要延迟加载
   setTimeout(loadVoices, 500);
+  setTimeout(loadVoices, 1500);
 }
 
-// 核心：说完再回调，确保语音和动画同步
+// 在用户首次点击时激活 TTS（手机端必须）
+function unlockTTS() {
+  if (ttsUnlocked || !window.speechSynthesis) return;
+  ttsUnlocked = true;
+  // iOS/Android 需要在用户手势中先说一个空白来激活
+  const u = new SpeechSynthesisUtterance('');
+  u.volume = 0;
+  u.lang = 'zh-CN';
+  speechSynthesis.speak(u);
+  // 重新加载声音列表（有些手机需要激活后才能获取）
+  setTimeout(() => {
+    const voices = speechSynthesis.getVoices();
+    if (voices.length > 0 && !ttsVoice) {
+      const preferred = ['Xiaoxiao', 'Xiaoyi', 'Meijia', 'Ting-Ting', 'TingTing',
+                         'Yaoyao', 'Huihui', 'Lili', 'Female', 'female'];
+      for (const name of preferred) {
+        const found = voices.find(v => v.lang.startsWith('zh') && v.name.includes(name));
+        if (found) { ttsVoice = found; break; }
+      }
+      if (!ttsVoice) {
+        ttsVoice = voices.find(v => v.lang === 'zh-CN') ||
+                   voices.find(v => v.lang.startsWith('zh')) || null;
+      }
+      ttsReady = true;
+    }
+  }, 300);
+}
+
+// 核心语音函数：说完再回调
 function elsaSpeak(text, callback) {
-  if (!window.speechSynthesis) {
-    if (callback) setTimeout(callback, 800);
+  if (!window.speechSynthesis || !text) {
+    if (callback) setTimeout(callback, 600);
     return;
   }
-  // 取消之前正在说的
+
+  // 确保已激活
+  if (!ttsUnlocked) unlockTTS();
+
+  // iOS Safari 有个 bug：长时间不说话后 speechSynthesis 会"暂停"
+  // 需要先 cancel 再 speak
   speechSynthesis.cancel();
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  if (ttsVoice) utterance.voice = ttsVoice;
-  utterance.lang = 'zh-CN';
-  utterance.rate = 0.8;   // 再慢一点，更清晰
-  utterance.pitch = 1.4;  // 高一些，甜美童声感
-  utterance.volume = 1.0;
+  // 短暂延迟让 cancel 生效（部分安卓需要）
+  setTimeout(() => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    if (ttsVoice) utterance.voice = ttsVoice;
+    utterance.lang = 'zh-CN';
+    utterance.rate = 0.8;
+    utterance.pitch = 1.4;
+    utterance.volume = 1.0;
 
-  // 超时保护：如果语音引擎卡住了，5秒后强制回调
-  let done = false;
-  const safetyTimer = setTimeout(() => {
-    if (!done && callback) { done = true; callback(); }
-  }, Math.max(text.length * 350, 2000));
+    let done = false;
+    const safetyTimer = setTimeout(() => {
+      if (!done) { done = true; if (callback) callback(); }
+    }, Math.max(text.length * 400, 2500));
 
-  utterance.onend = () => {
-    if (!done) {
-      done = true;
-      clearTimeout(safetyTimer);
-      if (callback) setTimeout(callback, 200); // 小停顿再继续
-    }
-  };
-  utterance.onerror = () => {
-    if (!done) {
-      done = true;
-      clearTimeout(safetyTimer);
-      if (callback) setTimeout(callback, 200);
-    }
-  };
+    utterance.onend = () => {
+      if (!done) {
+        done = true;
+        clearTimeout(safetyTimer);
+        if (callback) setTimeout(callback, 200);
+      }
+    };
+    utterance.onerror = (e) => {
+      if (!done) {
+        done = true;
+        clearTimeout(safetyTimer);
+        if (callback) setTimeout(callback, 200);
+      }
+    };
 
-  speechSynthesis.speak(utterance);
+    // iOS Safari 需要在 speak 后定期检查 paused 状态并 resume
+    speechSynthesis.speak(utterance);
+
+    // iOS workaround: 定期 resume 防止被系统暂停
+    const resumeInterval = setInterval(() => {
+      if (done) { clearInterval(resumeInterval); return; }
+      if (speechSynthesis.paused) speechSynthesis.resume();
+    }, 200);
+  }, 50);
 }
 
 // 数字转中文读法
@@ -1283,8 +1321,9 @@ function showScreen(id) {
 
 // ===== 开始游戏 =====
 function startGame() {
+  ensureAudio();
+  unlockTTS();  // 在用户点击时激活语音（手机端必须）
   playStartSound();
-  // 开始播放 Let It Go 背景音乐
   if (!bgmPlaying) startBgm();
   renderLevelCards();
   showScreen('level-select');
@@ -1314,6 +1353,8 @@ function renderLevelCards() {
 }
 
 function selectLevel(levelIdx) {
+  ensureAudio();
+  unlockTTS();
   currentLevel = levelIdx;
   startLevel();
 }
