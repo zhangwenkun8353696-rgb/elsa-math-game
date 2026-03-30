@@ -1018,11 +1018,10 @@ function preloadLevelAudio(levelIdx, cb) {
                      '再来一题！', '继续加油！', '这次试试看！', '来看这个！', '又有新题啦！', '加油呀！'];
   level.pairs.forEach((_, i) => texts.add(openLines[i % openLines.length]));
 
-  // 数量语音
+  // 数量语音 + 完整读题
   level.pairs.forEach(([a, b]) => {
-    texts.add('这边有' + numToChinese(a) + '个' + itemName);
-    texts.add('这边有' + numToChinese(b) + '个' + itemName);
-    texts.add(numToChinese(a) + '加' + numToChinese(b) + '，等于几呢？');
+    // 完整读题句（核心！）
+    texts.add(numToChinese(a) + '个' + itemName + '，加' + numToChinese(b) + '个' + itemName + '，等于几呢？');
     // 答对公式
     const ans = a + b;
     const praises = ['太棒了！', '你真聪明！', '小公主真厉害！', '太了不起了！', '完美！'];
@@ -1583,43 +1582,38 @@ function nextQuestion() {
   document.getElementById('dialogText').textContent = openLine;
 
   elsaSpeak(openLine, () => {
-    // 第2步：左组雪花逐个出现
+    // 第2步：左组物品逐个出现
     showFlakesSequentially('groupA', numA, emoji, () => {
-      // 第3步：说左边数量
-      const txtA = '这边有' + numToChinese(numA) + '个' + itemName;
-      document.getElementById('dialogText').textContent = '这边有 ' + numA + ' 个！';
+      // 显示左边数字
       document.getElementById('formulaDisplay').classList.add('show');
       document.getElementById('formulaA').textContent = numA;
       document.getElementById('formulaA').classList.add('show');
 
-      elsaSpeak(txtA, () => {
-        // 第4步：右组雪花逐个出现
+      // 第3步：右组物品逐个出现
+      setTimeout(() => {
         showFlakesSequentially('groupB', numB, emoji, () => {
-          // 第5步：说右边数量
-          const txtB = '这边有' + numToChinese(numB) + '个' + itemName;
-          document.getElementById('dialogText').textContent = '这边有 ' + numB + ' 个！';
+          // 显示算式
           document.getElementById('formulaPlus').classList.add('show');
           document.getElementById('formulaB').textContent = numB;
           document.getElementById('formulaB').classList.add('show');
+          document.getElementById('formulaEquals').classList.add('show');
+          document.getElementById('formulaAnswer').textContent = '?';
+          document.getElementById('formulaAnswer').classList.add('show');
 
-          elsaSpeak(txtB, () => {
-            // 第6步：提出加法问题
-            document.getElementById('dialogText').textContent = numA + ' + ' + numB + ' = ？';
-            document.getElementById('formulaEquals').classList.add('show');
-            document.getElementById('formulaAnswer').textContent = '?';
-            document.getElementById('formulaAnswer').classList.add('show');
+          // 第4步：一句完整读题！（核心改进）
+          const readQuestion = numToChinese(numA) + '个' + itemName + '，加' + numToChinese(numB) + '个' + itemName + '，等于几呢？';
+          document.getElementById('dialogText').textContent = numA + '个' + itemName + ' + ' + numB + '个' + itemName + ' = ？';
 
-            elsaSpeak(numToChinese(numA) + '加' + numToChinese(numB) + '，等于几呢？', () => {
-              // 第7步：显示选项
-              document.getElementById('countHintBtn').style.display = 'block';
-              document.getElementById('countDisplay').textContent = '👆 不确定就点雪花数一数';
-              showOptions();
-              isAnimating = false;
-              canAnswer = true;
-            });
+          elsaSpeak(readQuestion, () => {
+            // 第5步：显示选项
+            document.getElementById('countHintBtn').style.display = 'block';
+            document.getElementById('countDisplay').textContent = '👆 不确定就点雪花数一数';
+            showOptions();
+            isAnimating = false;
+            canAnswer = true;
           });
         });
-      });
+      }, 300);
     });
   });
 }
