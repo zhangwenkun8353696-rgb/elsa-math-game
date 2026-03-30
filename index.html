@@ -1087,69 +1087,107 @@ function playPianoNote(freq, startTime, duration, vol=0.07) {
   bgmNodes.push(osc1, osc2, gain, gain2);
 }
 
-// Let It Go 副歌旋律 — Ab 大调原曲精确版
+// Let It Go — Ab 大调八音盒风格完整版
+// 原曲 BPM ~137，这里放慢为 ~80 作为舒缓背景乐
 function getLetItGoMelody() {
-  // Ab 大调音符频率 (4-5八度)
   const N = {
-    'Ab3': 207.65, 'Bb3': 233.08, 'C4': 261.63, 'Db4': 277.18,
-    'Eb4': 311.13, 'F4': 349.23, 'G4': 392.00,
+    'F3': 174.61, 'G3': 196.00, 'Ab3': 207.65, 'Bb3': 233.08,
+    'C4': 261.63, 'Db4': 277.18, 'Eb4': 311.13, 'F4': 349.23, 'G4': 392.00,
     'Ab4': 415.30, 'Bb4': 466.16, 'C5': 523.25, 'Db5': 554.37,
     'Eb5': 622.25, 'F5': 698.46, 'G5': 783.99, 'Ab5': 830.61,
     'R': 0
   };
 
-  // 68 BPM, 4/4 拍, 偏慢抒情
-  const BPM = 68;
-  const q = 60 / BPM;       // 四分音符
-  const e = q / 2;           // 八分音符
-  const h = q * 2;           // 二分音符
-  const dq = q * 1.5;        // 附点四分
+  const BPM = 80;
+  const q = 60 / BPM;        // 四分音符 0.75s
+  const e = q / 2;            // 八分音符
+  const h = q * 2;            // 二分音符
+  const dq = q * 1.5;         // 附点四分
+  const dh = q * 3;           // 附点二分
   const w = q * 4;            // 全音符
+  const s = q / 4;            // 十六分音符
 
-  // Let It Go 副歌 — 精确简谱还原
-  // "Let it go, let it go, can't hold it back anymore"
-  // "Let it go, let it go, turn away and slam the door"
   const melody = [
-    // 前奏琶音 (Ab大调)
-    ['Ab3', e], ['Eb4', e], ['Ab4', e], ['Eb4', e],
-    ['Ab3', e], ['Eb4', e], ['Ab4', e], ['Eb4', e],
+    // === 前奏（钢琴琶音 Fm → Ab） ===
+    ['F3', e], ['C4', e], ['F4', e], ['Ab4', e],
+    ['F4', e], ['C4', e],
+    ['Ab3', e], ['Eb4', e], ['Ab4', e], ['C5', e],
+    ['Ab4', e], ['Eb4', e],
+    ['R', q],
 
-    // "Let it go" (Ab Bb C-)
-    ['Ab4', q], ['Bb4', q], ['C5', h],
-    // "let it go" (Ab Bb Db C-)
-    ['Ab4', q], ['Bb4', e], ['Db5', e], ['C5', h],
-    // "can't hold it back any-more"
+    // === 主歌第一段 ===
+    // "The snow glows white on the mountain tonight"
+    // Ab Bb | C C C C | Bb Ab | Ab-
+    ['Ab4', q], ['Bb4', q],
+    ['C5', e], ['C5', e], ['C5', e], ['C5', e],
+    ['Bb4', q], ['Ab4', q],
+    ['Ab4', h],
+    // "Not a footprint to be seen"
+    // Ab Bb | C C C C | Bb Ab Bb-
+    ['Ab4', q], ['Bb4', q],
+    ['C5', e], ['C5', e], ['C5', e], ['C5', e],
+    ['Bb4', e], ['Ab4', e], ['Bb4', h],
+    ['R', q],
+
+    // "A kingdom of isolation"
+    // Ab Bb | C C C C | Db C Bb Ab
+    ['Ab4', q], ['Bb4', q],
+    ['C5', e], ['C5', e], ['C5', e], ['C5', e],
+    ['Db5', e], ['C5', e], ['Bb4', q],
+    // "and it looks like I'm the queen"
+    // Bb C Db | Db Db C Bb | C-
+    ['Bb4', e], ['C5', e], ['Db5', q],
+    ['Db5', e], ['Db5', e], ['C5', e], ['Bb4', e],
+    ['C5', h],
+    ['R', q],
+
+    // === 副歌 "Let it go, let it go" ===
+    // Ab Bb | C---
+    ['Ab4', q], ['Bb4', q], ['C5', dh],
+    ['R', e],
+    // "Can't hold it back anymore"
+    ['Ab4', q], ['Bb4', e], ['Db5', e], ['C5', dh],
+    ['R', e],
+    // Ab Bb C C | C Bb Ab Ab
     ['Ab4', q], ['Bb4', q], ['C5', q], ['C5', e], ['Bb4', e],
-    ['Ab4', q], ['R', q],
+    ['Ab4', dq], ['R', e],
 
-    // "Let it go" (Ab Bb C-)  
-    ['Ab4', q], ['Bb4', q], ['C5', h],
-    // "let it go" (Eb Db C-)
-    ['Eb5', q], ['Db5', e], ['C5', e], ['C5', h],
-    // "turn a-way and slam the door"
+    // "Let it go, let it go"
+    ['Ab4', q], ['Bb4', q], ['C5', dh],
+    ['R', e],
+    // "Turn away and slam the door"
+    ['Eb5', dq], ['Db5', e], ['C5', q], ['C5', h],
+    ['R', e],
     ['Ab4', q], ['Bb4', q], ['C5', q], ['C5', e], ['Bb4', e],
-    ['Ab4', h], ['R', q],
+    ['Ab4', h],
+    ['R', h],
 
-    // 间奏琶音
+    // === 桥段 "I don't care" ===
+    // Eb4 Ab4 C5 Eb5 | C5 Ab4
     ['Eb4', e], ['Ab4', e], ['C5', e], ['Eb5', e],
     ['C5', e], ['Ab4', e],
+    ['R', q],
 
     // "I don't care what they're going to say"
     ['C5', q], ['C5', e], ['Bb4', e], ['Ab4', q],
     ['Bb4', q], ['C5', dq], ['R', e],
 
-    // "Let the storm rage on"  (Eb5 Db5 C5 Bb4 C5-)
+    // "Let the storm rage on"
     ['Eb5', dq], ['Db5', e], ['C5', q], ['Bb4', q],
-    ['C5', h], ['R', q],
+    ['C5', dh],
+    ['R', q],
 
     // "The cold never bothered me anyway"
     ['Ab4', q], ['Bb4', e], ['C5', e], ['C5', q],
     ['Bb4', e], ['Ab4', e], ['G4', q],
-    ['Ab4', h], ['R', h],
+    ['Ab4', dh],
+    ['R', h],
 
-    // 尾声琶音渐弱
+    // === 尾声琶音（渐弱） ===
     ['Eb4', e], ['Ab4', e], ['C5', e], ['Eb5', e],
-    ['Ab5', q], ['R', h],
+    ['Ab5', dq], ['Eb5', e],
+    ['C5', q], ['Ab4', q],
+    ['R', dh],
   ];
 
   return melody.map(([note, dur]) => ({
@@ -1216,36 +1254,36 @@ function toggleMusic() {
 
 // ===== 游戏状态 =====
 const LEVELS = [
-  // 第1关：最简单，1+1到1+2，3题热身
+  // 第1关：最简单，1+1到2+1，6题
   { name: '第一关', emoji: '❄️', flakeEmoji: '❄️', desc: '初识加法',
-    pairs: [[1,1],[1,2],[2,1]] },
-  // 第2关：+1为主，3题
-  { name: '第二关', emoji: '⭐', flakeEmoji: '❄️', desc: '加1练习',
-    pairs: [[2,1],[1,3],[3,1]] },
-  // 第3关：结果不超过5，4题
+    pairs: [[1,1],[1,2],[2,1],[1,1],[2,1],[1,2]] },
+  // 第2关：+1/+2为主，6题
+  { name: '第二关', emoji: '⭐', flakeEmoji: '❄️', desc: '加1加2',
+    pairs: [[2,1],[1,3],[3,1],[1,2],[2,2],[1,3]] },
+  // 第3关：结果不超过5，6题
   { name: '第三关', emoji: '🌟', flakeEmoji: '⛄', desc: '凑到5',
-    pairs: [[2,2],[1,4],[3,2],[2,3]] },
-  // 第4关：结果不超过5巩固，4题
+    pairs: [[2,2],[1,4],[3,2],[2,3],[4,1],[1,3]] },
+  // 第4关：结果不超过5巩固，6题
   { name: '第四关', emoji: '🦌', flakeEmoji: '⛄', desc: '5以内巩固',
-    pairs: [[4,1],[1,3],[2,3],[3,2]] },
-  // 第5关：结果5-6，4题
+    pairs: [[4,1],[1,4],[2,3],[3,2],[3,1],[2,2]] },
+  // 第5关：结果5-6，6题
   { name: '第五关', emoji: '🏰', flakeEmoji: '💎', desc: '挑战6',
-    pairs: [[3,3],[2,4],[4,2],[1,5]] },
-  // 第6关：结果5-7，5题
+    pairs: [[3,3],[2,4],[4,2],[1,5],[5,1],[3,2]] },
+  // 第6关：结果5-7，7题
   { name: '第六关', emoji: '💎', flakeEmoji: '💎', desc: '到7啦',
-    pairs: [[3,4],[4,3],[2,5],[5,2],[1,6]] },
-  // 第7关：结果6-8，5题
+    pairs: [[3,4],[4,3],[2,5],[5,2],[1,6],[6,1],[3,3]] },
+  // 第7关：结果6-8，7题
   { name: '第七关', emoji: '🌈', flakeEmoji: '✨', desc: '越来越棒',
-    pairs: [[4,4],[3,5],[5,3],[2,6],[4,3]] },
-  // 第8关：结果7-8，6题
+    pairs: [[4,4],[3,5],[5,3],[2,6],[4,3],[3,4],[4,2]] },
+  // 第8关：结果7-8，7题
   { name: '第八关', emoji: '🎀', flakeEmoji: '✨', desc: '快到9了',
-    pairs: [[4,4],[3,5],[5,3],[4,3],[2,6],[6,2]] },
-  // 第9关：结果8-9，6题
+    pairs: [[4,4],[3,5],[5,3],[4,3],[2,6],[6,2],[3,4]] },
+  // 第9关：结果8-9，8题
   { name: '第九关', emoji: '👑', flakeEmoji: '🌸', desc: '冲刺9',
-    pairs: [[4,5],[5,4],[3,6],[6,3],[5,3],[4,4]] },
-  // 第10关：全范围混合大挑战，7题
+    pairs: [[4,5],[5,4],[3,6],[6,3],[5,3],[4,4],[5,4],[3,5]] },
+  // 第10关：全范围混合大挑战，8题
   { name: '第十关', emoji: '🏆', flakeEmoji: '🌸', desc: '全能公主',
-    pairs: [[5,4],[3,6],[4,5],[6,3],[2,7],[5,3],[4,4]] },
+    pairs: [[5,4],[3,6],[4,5],[6,3],[2,7],[5,3],[4,4],[7,2]] },
 ];
 
 let currentLevel = 0;
