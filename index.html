@@ -794,6 +794,9 @@
         <div class="dialog-bubble" id="dialogText">帮艾莎数一数魔法雪花吧！</div>
       </div>
 
+      <!-- 操作按钮（在对话气泡下方） -->
+      <button class="count-hint-btn" id="countHintBtn">👆 点一点数一数</button>
+
       <!-- 雪花展示 -->
       <div class="snowflake-display" id="snowflakeDisplay">
         <div class="flake-group" id="groupA"></div>
@@ -815,9 +818,6 @@
 
       <!-- 合并区域 -->
       <div class="merge-area" id="mergeArea"></div>
-
-      <!-- 数一数按钮 -->
-      <button class="count-hint-btn" id="countHintBtn" onclick="startCounting()">👆 点一点数一数</button>
     </div>
 
     <!-- 选项区域 -->
@@ -1689,14 +1689,18 @@ function nextQuestion() {
                 }, 300);
               };
             } else {
-              const optCount = mode === 'choose2' ? 2 : 3;
-              document.getElementById('countHintBtn').textContent = '👆 点一点数一数';
-              document.getElementById('countHintBtn').onclick = function() { startCounting(); };
-              document.getElementById('countHintBtn').style.display = 'block';
-              document.getElementById('countDisplay').textContent = '👆 不确定就点' + itemName + '数一数';
-              showOptions(optCount);
+              // 选择模式：显示"我知道！"按钮，点击后出选项
               isAnimating = false;
-              canAnswer = true;
+              const optCount = mode === 'choose2' ? 2 : 3;
+              document.getElementById('countHintBtn').textContent = '🙋 我知道答案！';
+              document.getElementById('countHintBtn').style.display = 'block';
+              document.getElementById('countHintBtn').onclick = function() {
+                if (isStale()) return;
+                this.style.display = 'none';
+                document.getElementById('countDisplay').textContent = '';
+                showOptions(optCount);
+                canAnswer = true;
+              };
             }
           });
         });
