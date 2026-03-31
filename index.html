@@ -1032,6 +1032,9 @@ function preloadLevelAudio(levelIdx, cb) {
   texts.add('再想想呀，不着急！');
   texts.add('没关系的，再试一次！');
   texts.add('点雪花数一数就知道啦！');
+  // 合并模式语音
+  texts.add('把它们放到一起吧！');
+  texts.add('现在点一个数一个吧！');
 
   // 显示加载提示
   document.getElementById('dialogText').textContent = '艾莎正在准备中...✨';
@@ -1342,36 +1345,27 @@ function toggleMusic() {
 }
 
 // ===== 游戏状态 =====
+// mode: 'count'=合并后点数, 'choose2'=2选1, 'choose3'=3选1
 const LEVELS = [
-  // 第1关：数雪花，6题
-  { name: '第一关', emoji: '❄️', flakeEmoji: '❄️', desc: '数雪花',
+  { name: '第一关', emoji: '❄️', flakeEmoji: '❄️', desc: '数雪花', mode: 'count',
     pairs: [[1,1],[1,2],[2,1],[1,1],[2,1],[1,2]] },
-  // 第2关：数星星，6题
-  { name: '第二关', emoji: '⭐', flakeEmoji: '⭐', desc: '数星星',
+  { name: '第二关', emoji: '⭐', flakeEmoji: '⭐', desc: '数星星', mode: 'count',
     pairs: [[2,1],[1,3],[3,1],[1,2],[2,2],[1,3]] },
-  // 第3关：数雪人，6题
-  { name: '第三关', emoji: '⛄', flakeEmoji: '⛄', desc: '堆雪人',
+  { name: '第三关', emoji: '⛄', flakeEmoji: '⛄', desc: '堆雪人', mode: 'count',
     pairs: [[2,2],[1,4],[3,2],[2,3],[4,1],[1,3]] },
-  // 第4关：数小鹿，6题
-  { name: '第四关', emoji: '🦌', flakeEmoji: '🦌', desc: '找小鹿',
+  { name: '第四关', emoji: '🦌', flakeEmoji: '🦌', desc: '找小鹿', mode: 'choose2',
     pairs: [[4,1],[1,4],[2,3],[3,2],[3,1],[2,2]] },
-  // 第5关：数城堡，6题
-  { name: '第五关', emoji: '🏰', flakeEmoji: '🏰', desc: '建城堡',
+  { name: '第五关', emoji: '🏰', flakeEmoji: '🏰', desc: '建城堡', mode: 'choose2',
     pairs: [[3,3],[2,4],[4,2],[1,5],[5,1],[3,2]] },
-  // 第6关：数钻石，7题
-  { name: '第六关', emoji: '💎', flakeEmoji: '💎', desc: '找钻石',
+  { name: '第六关', emoji: '💎', flakeEmoji: '💎', desc: '找钻石', mode: 'choose2',
     pairs: [[3,4],[4,3],[2,5],[5,2],[1,6],[6,1],[3,3]] },
-  // 第7关：数彩虹，7题
-  { name: '第七关', emoji: '🌈', flakeEmoji: '🌈', desc: '追彩虹',
+  { name: '第七关', emoji: '🌈', flakeEmoji: '🌈', desc: '追彩虹', mode: 'choose3',
     pairs: [[4,4],[3,5],[5,3],[2,6],[4,3],[3,4],[4,2]] },
-  // 第8关：数蝴蝶结，7题
-  { name: '第八关', emoji: '🎀', flakeEmoji: '🎀', desc: '系蝴蝶结',
+  { name: '第八关', emoji: '🎀', flakeEmoji: '🎀', desc: '系蝴蝶结', mode: 'choose3',
     pairs: [[4,4],[3,5],[5,3],[4,3],[2,6],[6,2],[3,4]] },
-  // 第9关：数皇冠，8题
-  { name: '第九关', emoji: '👑', flakeEmoji: '👑', desc: '集皇冠',
+  { name: '第九关', emoji: '👑', flakeEmoji: '👑', desc: '集皇冠', mode: 'choose3',
     pairs: [[4,5],[5,4],[3,6],[6,3],[5,3],[4,4],[5,4],[3,5]] },
-  // 第10关：数奖杯，8题
-  { name: '第十关', emoji: '🏆', flakeEmoji: '🏆', desc: '夺奖杯',
+  { name: '第十关', emoji: '🏆', flakeEmoji: '🏆', desc: '夺奖杯', mode: 'choose3',
     pairs: [[5,4],[3,6],[4,5],[6,3],[2,7],[5,3],[4,4],[7,2]] },
 ];
 
@@ -1459,7 +1453,7 @@ function renderLevelCards() {
       <div class="level-card-icon">${level.emoji}</div>
       <div class="level-card-info">
         <div class="level-card-name">${level.name} · ${level.desc}</div>
-        <div class="level-card-desc">${level.pairs.length}题</div>
+        <div class="level-card-desc">${level.pairs.length}题 · ${level.mode === 'count' ? '数一数' : level.mode === 'choose2' ? '二选一' : '三选一'}</div>
       </div>
       <div class="level-card-arrow">›</div>
     `;
@@ -1574,6 +1568,7 @@ function nextQuestion() {
   const itemName = itemNames[emoji] || '宝贝';
 
   // ====== 串行流程：等语音说完再下一步 ======
+  const mode = level.mode || 'choose3';
 
   // 第1步：开场语
   const openLines = ['小公主，来看看！', '艾莎要变魔法啦！', '准备好了吗？', '新的题来啦！',
@@ -1584,33 +1579,41 @@ function nextQuestion() {
   elsaSpeak(openLine, () => {
     // 第2步：左组物品逐个出现
     showFlakesSequentially('groupA', numA, emoji, () => {
-      // 显示左边数字
       document.getElementById('formulaDisplay').classList.add('show');
       document.getElementById('formulaA').textContent = numA;
       document.getElementById('formulaA').classList.add('show');
 
-      // 第3步：右组物品逐个出现
       setTimeout(() => {
+        // 第3步：右组物品逐个出现
         showFlakesSequentially('groupB', numB, emoji, () => {
-          // 显示算式
           document.getElementById('formulaPlus').classList.add('show');
           document.getElementById('formulaB').textContent = numB;
           document.getElementById('formulaB').classList.add('show');
+
+          // 第4步：读题
+          const readQuestion = numToChinese(numA) + '个' + itemName + '，加' + numToChinese(numB) + '个' + itemName + '，等于几呢？';
+          document.getElementById('dialogText').textContent = numA + '个' + itemName + ' + ' + numB + '个' + itemName + ' = ？';
           document.getElementById('formulaEquals').classList.add('show');
           document.getElementById('formulaAnswer').textContent = '?';
           document.getElementById('formulaAnswer').classList.add('show');
 
-          // 第4步：一句完整读题！（核心改进）
-          const readQuestion = numToChinese(numA) + '个' + itemName + '，加' + numToChinese(numB) + '个' + itemName + '，等于几呢？';
-          document.getElementById('dialogText').textContent = numA + '个' + itemName + ' + ' + numB + '个' + itemName + ' = ？';
-
           elsaSpeak(readQuestion, () => {
-            // 第5步：显示选项
-            document.getElementById('countHintBtn').style.display = 'block';
-            document.getElementById('countDisplay').textContent = '👆 不确定就点雪花数一数';
-            showOptions();
-            isAnimating = false;
-            canAnswer = true;
+            // 第5步：魔法合并动画 + 根据模式答题
+            if (mode === 'count') {
+              // === 数数模式：合并后点着数 ===
+              document.getElementById('dialogText').textContent = '✨ 把它们放到一起！';
+              elsaSpeak('把它们放到一起吧！', () => {
+                startMergeAndCount();
+              });
+            } else {
+              // === 选择模式：显示选项 ===
+              const optCount = mode === 'choose2' ? 2 : 3;
+              document.getElementById('countHintBtn').style.display = 'block';
+              document.getElementById('countDisplay').textContent = '👆 不确定就点物品数一数';
+              showOptions(optCount);
+              isAnimating = false;
+              canAnswer = true;
+            }
           });
         });
       }, 300);
@@ -1641,6 +1644,109 @@ function showFlakesSequentially(groupId, count, emoji, callback) {
     setTimeout(showNext, 300);
   }
   setTimeout(showNext, 150);
+}
+
+// ===== 魔法合并 + 点数答题（前3关核心玩法）=====
+function startMergeAndCount() {
+  const level = LEVELS[currentLevel];
+  const emoji = level.flakeEmoji;
+
+  // 隐藏两组展示区，显示合并区
+  document.getElementById('snowflakeDisplay').style.display = 'none';
+  const mergeArea = document.getElementById('mergeArea');
+  mergeArea.innerHTML = '';
+  mergeArea.style.display = 'flex';
+
+  // 播放魔法音效
+  playMagicSound();
+
+  // 把所有物品放入合并区（带飞入动画）
+  for (let i = 0; i < answer; i++) {
+    const flake = document.createElement('span');
+    flake.className = 'flake-item';
+    flake.textContent = emoji;
+    flake.style.opacity = '0.4';
+    flake.style.transform = 'scale(0)';
+    flake.dataset.countIdx = i;
+    mergeArea.appendChild(flake);
+
+    // 逐个飞入动画
+    setTimeout(() => {
+      flake.style.transition = 'all 0.4s ease-out';
+      flake.style.opacity = '0.4';
+      flake.style.transform = 'scale(1)';
+      playTone(500 + i * 60, 0.1, 'sine', 0.05);
+    }, i * 150);
+  }
+
+  // 全部飞入后，提示点数
+  setTimeout(() => {
+    countIndex = 0;
+    isCountingMode = true;
+    document.getElementById('dialogText').textContent = '👆 点一个数一个！';
+    document.getElementById('countDisplay').textContent = '';
+    elsaSpeak('现在点一个数一个吧！');
+
+    // 给每个物品绑定点击事件
+    for (let i = 0; i < answer; i++) {
+      mergeArea.children[i].addEventListener('click', () => handleCountTap(i));
+      mergeArea.children[i].style.cursor = 'pointer';
+    }
+    isAnimating = false;
+  }, answer * 150 + 500);
+}
+
+// 点数答题的点击处理
+function handleCountTap(idx) {
+  if (idx !== countIndex) return;
+  const mergeArea = document.getElementById('mergeArea');
+  const flake = mergeArea.children[idx];
+
+  // 点亮 + 弹跳动画
+  flake.style.opacity = '1';
+  flake.classList.add('counted');
+  flake.style.transform = 'scale(1.3)';
+  setTimeout(() => { flake.style.transform = 'scale(1)'; }, 200);
+
+  countIndex++;
+  playCountSound(countIndex - 1);
+
+  // 显示当前数到几
+  document.getElementById('countDisplay').textContent = '🔢 ' + countIndex;
+
+  if (countIndex >= answer) {
+    // 数完了！自动算对
+    isCountingMode = false;
+    canAnswer = false;
+
+    setTimeout(() => {
+      // 更新算式显示答案
+      document.getElementById('formulaAnswer').textContent = answer;
+      document.getElementById('formulaAnswer').classList.add('show');
+
+      const formulaText = numA + ' + ' + numB + ' = ' + answer;
+      document.getElementById('dialogText').textContent = formulaText + ' 🎉 太棒了！';
+      document.getElementById('countDisplay').textContent = '';
+
+      playCorrectSound();
+      starsEarned++;
+      updateStarsBar();
+
+      // 语音说出公式
+      const praises = ['太棒了！', '你真聪明！', '小公主真厉害！', '太了不起了！', '完美！'];
+      const praise = praises[currentQuestion % praises.length];
+      elsaSpeak(numToChinese(numA) + '加' + numToChinese(numB) + '等于' + numToChinese(answer) + '！' + praise, () => {
+        setTimeout(() => {
+          currentQuestion++;
+          nextQuestion();
+        }, 500);
+      });
+
+      // 粒子特效
+      const mergeRect = document.getElementById('mergeArea').getBoundingClientRect();
+      createMagicBurst({ getBoundingClientRect: () => mergeRect });
+    }, 500);
+  }
 }
 
 // ===== 数一数功能 =====
@@ -1716,7 +1822,8 @@ function countFlake(idx) {
 }
 
 // ===== 选项 =====
-function showOptions() {
+function showOptions(optCount) {
+  optCount = optCount || 3;
   const optionsArea = document.getElementById('optionsArea');
   optionsArea.innerHTML = '';
 
@@ -1732,8 +1839,9 @@ function showOptions() {
     } while (d < 1 || d > 10 || options.includes(d));
     return d;
   };
-  options.push(makeDistractor());
-  options.push(makeDistractor());
+  for (let i = 1; i < optCount; i++) {
+    options.push(makeDistractor());
+  }
 
   // 打乱顺序
   options.sort(() => Math.random() - 0.5);
