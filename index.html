@@ -1010,23 +1010,24 @@ function preloadLevelAudio(levelIdx, cb) {
   };
   const itemName = itemNames[emoji] || '宝贝';
 
-  // 收集本关需要的所有语音文本
+  // 收集本关需要的所有语音文本（基于范围枚举所有可能）
   const texts = new Set();
 
   // 开场语
   const openLines = ['小公主，来看看！', '艾莎要变魔法啦！', '准备好了吗？', '新的题来啦！',
                      '再来一题！', '继续加油！', '这次试试看！', '来看这个！', '又有新题啦！', '加油呀！'];
-  level.pairs.forEach((_, i) => texts.add(openLines[i % openLines.length]));
+  openLines.forEach(t => texts.add(t));
 
-  // 数量语音 + 完整读题
-  level.pairs.forEach(([a, b]) => {
-    // 完整读题句（核心！）
-    texts.add(numToChinese(a) + '个' + itemName + '，加' + numToChinese(b) + '个' + itemName + '，等于几呢？');
-    // 答对公式
-    const ans = a + b;
-    const praises = ['太棒了！', '你真聪明！', '小公主真厉害！', '太了不起了！', '完美！'];
-    texts.add(numToChinese(a) + '加' + numToChinese(b) + '等于' + numToChinese(ans) + '！' + praises[0]);
-  });
+  // 枚举所有可能的 (a,b) 组合的语音
+  for (let a = level.minA; a <= level.maxA; a++) {
+    for (let b = level.minB; b <= level.maxB; b++) {
+      if (a + b <= level.maxSum) {
+        texts.add(numToChinese(a) + '个' + itemName + '，加' + numToChinese(b) + '个' + itemName + '，等于几呢？');
+        const ans = a + b;
+        texts.add(numToChinese(a) + '加' + numToChinese(b) + '等于' + numToChinese(ans) + '！太棒了！');
+      }
+    }
+  }
 
   // 答错鼓励
   texts.add('再想想呀，不着急！');
@@ -1346,31 +1347,68 @@ function toggleMusic() {
 
 // ===== 游戏状态 =====
 // mode: 'count'=合并后点数, 'choose2'=2选1, 'choose3'=3选1
+// minA/maxA: 左边数字范围, minB/maxB: 右边数字范围, maxSum: 答案上限, count: 每次出题数
 const LEVELS = [
   { name: '第一关', emoji: '❄️', flakeEmoji: '❄️', desc: '数雪花', mode: 'count',
-    pairs: [[1,1],[1,2],[2,1],[1,1],[2,1],[1,2]] },
+    minA:1, maxA:2, minB:1, maxB:2, maxSum:3, count:6 },
   { name: '第二关', emoji: '⭐', flakeEmoji: '⭐', desc: '数星星', mode: 'count',
-    pairs: [[2,1],[1,3],[3,1],[1,2],[2,2],[1,3]] },
+    minA:1, maxA:3, minB:1, maxB:3, maxSum:4, count:6 },
   { name: '第三关', emoji: '⛄', flakeEmoji: '⛄', desc: '堆雪人', mode: 'count',
-    pairs: [[2,2],[1,4],[3,2],[2,3],[4,1],[1,3]] },
+    minA:1, maxA:4, minB:1, maxB:4, maxSum:5, count:6 },
   { name: '第四关', emoji: '🦌', flakeEmoji: '🦌', desc: '找小鹿', mode: 'choose2',
-    pairs: [[4,1],[1,4],[2,3],[3,2],[3,1],[2,2]] },
+    minA:1, maxA:4, minB:1, maxB:4, maxSum:5, count:6 },
   { name: '第五关', emoji: '🏰', flakeEmoji: '🏰', desc: '建城堡', mode: 'choose2',
-    pairs: [[3,3],[2,4],[4,2],[1,5],[5,1],[3,2]] },
+    minA:1, maxA:5, minB:1, maxB:5, maxSum:6, count:6 },
   { name: '第六关', emoji: '💎', flakeEmoji: '💎', desc: '找钻石', mode: 'choose2',
-    pairs: [[3,4],[4,3],[2,5],[5,2],[1,6],[6,1],[3,3]] },
+    minA:1, maxA:6, minB:1, maxB:6, maxSum:7, count:7 },
   { name: '第七关', emoji: '🌈', flakeEmoji: '🌈', desc: '追彩虹', mode: 'choose3',
-    pairs: [[4,4],[3,5],[5,3],[2,6],[4,3],[3,4],[4,2]] },
+    minA:2, maxA:6, minB:2, maxB:6, maxSum:8, count:7 },
   { name: '第八关', emoji: '🎀', flakeEmoji: '🎀', desc: '系蝴蝶结', mode: 'choose3',
-    pairs: [[4,4],[3,5],[5,3],[4,3],[2,6],[6,2],[3,4]] },
+    minA:2, maxA:6, minB:2, maxB:6, maxSum:8, count:7 },
   { name: '第九关', emoji: '👑', flakeEmoji: '👑', desc: '集皇冠', mode: 'choose3',
-    pairs: [[4,5],[5,4],[3,6],[6,3],[5,3],[4,4],[5,4],[3,5]] },
+    minA:3, maxA:6, minB:3, maxB:6, maxSum:9, count:8 },
   { name: '第十关', emoji: '🏆', flakeEmoji: '🏆', desc: '夺奖杯', mode: 'choose3',
-    pairs: [[5,4],[3,6],[4,5],[6,3],[2,7],[5,3],[4,4],[7,2]] },
+    minA:2, maxA:7, minB:2, maxB:7, maxSum:9, count:8 },
 ];
+
+// 为指定关卡随机生成题目
+function generatePairs(levelIdx) {
+  const lv = LEVELS[levelIdx];
+  const allPossible = [];
+  // 枚举所有满足条件的 (a,b) 组合
+  for (let a = lv.minA; a <= lv.maxA; a++) {
+    for (let b = lv.minB; b <= lv.maxB; b++) {
+      if (a + b <= lv.maxSum) {
+        allPossible.push([a, b]);
+      }
+    }
+  }
+  // 洗牌
+  for (let i = allPossible.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allPossible[i], allPossible[j]] = [allPossible[j], allPossible[i]];
+  }
+  // 取需要的数量，如果可选题不够就循环复用（再次洗牌）
+  const result = [];
+  while (result.length < lv.count) {
+    const remaining = lv.count - result.length;
+    if (remaining >= allPossible.length) {
+      result.push(...allPossible);
+      // 再洗一次，保证下一轮顺序不同
+      for (let i = allPossible.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allPossible[i], allPossible[j]] = [allPossible[j], allPossible[i]];
+      }
+    } else {
+      result.push(...allPossible.slice(0, remaining));
+    }
+  }
+  return result;
+}
 
 let currentLevel = 0;
 let currentQuestion = 0;
+let currentPairs = []; // 当前关卡的随机题目
 let starsEarned = 0;
 let numA = 0, numB = 0, answer = 0;
 let countIndex = 0;
@@ -1453,7 +1491,7 @@ function renderLevelCards() {
       <div class="level-card-icon">${level.emoji}</div>
       <div class="level-card-info">
         <div class="level-card-name">${level.name} · ${level.desc}</div>
-        <div class="level-card-desc">${level.pairs.length}题 · ${level.mode === 'count' ? '数一数' : level.mode === 'choose2' ? '二选一' : '三选一'}</div>
+        <div class="level-card-desc">${level.count}题 · ${level.mode === 'count' ? '数一数' : level.mode === 'choose2' ? '二选一' : '三选一'}</div>
       </div>
       <div class="level-card-arrow">›</div>
     `;
@@ -1483,10 +1521,12 @@ function restartGame() {
 function startLevel() {
   currentQuestion = 0;
   starsEarned = 0;
+  // 随机生成本关题目！
+  currentPairs = generatePairs(currentLevel);
   const level = LEVELS[currentLevel];
   const starsBar = document.getElementById('starsBar');
   starsBar.innerHTML = '';
-  for (let i = 0; i < level.pairs.length; i++) {
+  for (let i = 0; i < currentPairs.length; i++) {
     const span = document.createElement('span');
     span.className = 'star-icon';
     span.dataset.idx = i;
@@ -1524,7 +1564,7 @@ function updateStarsBar() {
 // ===== 出题 =====
 function nextQuestion() {
   const level = LEVELS[currentLevel];
-  if (currentQuestion >= level.pairs.length) {
+  if (currentQuestion >= currentPairs.length) {
     showLevelComplete();
     return;
   }
@@ -1534,7 +1574,7 @@ function nextQuestion() {
   isCountingMode = false;
   countIndex = 0;
 
-  const pair = level.pairs[currentQuestion];
+  const pair = currentPairs[currentQuestion];
   numA = pair[0];
   numB = pair[1];
   answer = numA + numB;
