@@ -1403,6 +1403,7 @@ function generatePairs(levelIdx) {
 let currentLevel = 0;
 let currentQuestion = 0;
 let currentPairs = []; // 当前关卡的随机题目
+let questionId = 0;   // 防止旧动画干扰新题
 let starsEarned = 0;
 let numA = 0, numB = 0, answer = 0;
 let countIndex = 0;
@@ -1561,6 +1562,9 @@ function nextQuestion() {
     return;
   }
 
+  questionId++; // 递增，防止旧回调干扰
+  const myQid = questionId;
+
   isAnimating = true;
   canAnswer = false;
   isCountingMode = false;
@@ -1571,7 +1575,7 @@ function nextQuestion() {
   numB = pair[1];
   answer = numA + numB;
 
-  // 清空
+  // 清空所有区域
   document.getElementById('groupA').innerHTML = '';
   document.getElementById('groupB').innerHTML = '';
   document.getElementById('countDisplay').textContent = '';
@@ -1599,8 +1603,10 @@ function nextQuestion() {
   };
   const itemName = itemNames[emoji] || '宝贝';
 
-  // ====== 串行流程：等语音说完再下一步 ======
   const mode = level.mode || 'choose3';
+
+  // 检查是否还是当前题目（防止旧回调）
+  function isStale() { return questionId !== myQid; }
 
   // 第1步：开场语
   const openLines = ['小公主，来看看！', '艾莎要变魔法啦！', '准备好了吗？', '新的题来啦！',
@@ -1609,15 +1615,19 @@ function nextQuestion() {
   document.getElementById('dialogText').textContent = openLine;
 
   elsaSpeak(openLine, () => {
+    if (isStale()) return;
     // 第2步：左组物品逐个出现
     showFlakesSequentially('groupA', numA, emoji, () => {
+      if (isStale()) return;
       document.getElementById('formulaDisplay').classList.add('show');
       document.getElementById('formulaA').textContent = numA;
       document.getElementById('formulaA').classList.add('show');
 
       setTimeout(() => {
+        if (isStale()) return;
         // 第3步：右组物品逐个出现
         showFlakesSequentially('groupB', numB, emoji, () => {
+          if (isStale()) return;
           document.getElementById('formulaPlus').classList.add('show');
           document.getElementById('formulaB').textContent = numB;
           document.getElementById('formulaB').classList.add('show');
@@ -1630,15 +1640,15 @@ function nextQuestion() {
           document.getElementById('formulaAnswer').classList.add('show');
 
           elsaSpeak(readQuestion, () => {
-            // 第5步：魔法合并动画 + 根据模式答题
+            if (isStale()) return;
             if (mode === 'count') {
-              // === 数数模式：合并后点着数 ===
+              // 数数模式：读题说完后再说合并
               document.getElementById('dialogText').textContent = '✨ 把它们放到一起！';
               elsaSpeak('把它们放到一起吧！', () => {
+                if (isStale()) return;
                 startMergeAndCount();
               });
             } else {
-              // === 选择模式：显示选项 ===
               const optCount = mode === 'choose2' ? 2 : 3;
               document.getElementById('countHintBtn').style.display = 'block';
               document.getElementById('countDisplay').textContent = '👆 不确定就点物品数一数';
@@ -1648,7 +1658,7 @@ function nextQuestion() {
             }
           });
         });
-      }, 300);
+      }, 200);
     });
   });
 }
