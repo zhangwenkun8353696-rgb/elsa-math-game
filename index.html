@@ -1672,14 +1672,26 @@ function nextQuestion() {
           elsaSpeak(readQuestion, () => {
             if (isStale()) return;
             if (mode === 'count') {
-              // 数数模式：读题说完后再说合并
-              document.getElementById('dialogText').textContent = '✨ 把它们放到一起！';
-              elsaSpeak('把它们放到一起吧！', () => {
+              // 数数模式：显示"放到一起"按钮，等小朋友点击
+              isAnimating = false;
+              document.getElementById('dialogText').textContent = '👇 点下面的按钮，把它们放到一起！';
+              document.getElementById('countHintBtn').textContent = '✨ 放到一起！';
+              document.getElementById('countHintBtn').style.display = 'block';
+              document.getElementById('countHintBtn').onclick = function() {
                 if (isStale()) return;
-                startMergeAndCount();
-              });
+                this.style.display = 'none';
+                document.getElementById('dialogText').textContent = '✨ 把它们放到一起！';
+                elsaSpeak('把它们放到一起吧！');
+                // 不等语音回调，直接开始合并动画（语音和动画同步进行）
+                setTimeout(() => {
+                  if (isStale()) return;
+                  startMergeAndCount();
+                }, 300);
+              };
             } else {
               const optCount = mode === 'choose2' ? 2 : 3;
+              document.getElementById('countHintBtn').textContent = '👆 点一点数一数';
+              document.getElementById('countHintBtn').onclick = function() { startCounting(); };
               document.getElementById('countHintBtn').style.display = 'block';
               document.getElementById('countDisplay').textContent = '👆 不确定就点' + itemName + '数一数';
               showOptions(optCount);
