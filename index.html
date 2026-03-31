@@ -1662,13 +1662,6 @@ function nextQuestion() {
           document.getElementById('formulaB').textContent = numB;
           document.getElementById('formulaB').classList.add('show');
 
-          // 第4步：读题
-          const readQuestion = numToChinese(numA) + '个' + itemName + '，加' + numToChinese(numB) + '个' + itemName + '，等于几呢？';
-          document.getElementById('dialogText').textContent = numA + '个' + itemName + ' + ' + numB + '个' + itemName + ' = ？';
-          document.getElementById('formulaEquals').classList.add('show');
-          document.getElementById('formulaAnswer').textContent = '?';
-          document.getElementById('formulaAnswer').classList.add('show');
-
           // 第4步：读题（不依赖回调驱动流程，语音和UI分离）
           const readQuestion = numToChinese(numA) + '个' + itemName + '，加' + numToChinese(numB) + '个' + itemName + '，等于几呢？';
           document.getElementById('dialogText').textContent = numA + '个' + itemName + ' + ' + numB + '个' + itemName + ' = ？';
