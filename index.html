@@ -1669,39 +1669,71 @@ function nextQuestion() {
           document.getElementById('formulaAnswer').textContent = '?';
           document.getElementById('formulaAnswer').classList.add('show');
 
-          elsaSpeak(readQuestion, () => {
+          // 第4步：读题（不依赖回调驱动流程，语音和UI分离）
+          const readQuestion = numToChinese(numA) + '个' + itemName + '，加' + numToChinese(numB) + '个' + itemName + '，等于几呢？';
+          document.getElementById('dialogText').textContent = numA + '个' + itemName + ' + ' + numB + '个' + itemName + ' = ？';
+          document.getElementById('formulaEquals').classList.add('show');
+          document.getElementById('formulaAnswer').textContent = '?';
+          document.getElementById('formulaAnswer').classList.add('show');
+
+          // 播放读题语音（不等回调）
+          elsaSpeak(readQuestion);
+
+          // 固定延时后显示操作按钮（给语音足够时间播完）
+          const readDelay = 3500;
+          setTimeout(() => {
             if (isStale()) return;
+            isAnimating = false;
+
             if (mode === 'count') {
-              // 数数模式：显示"放到一起"按钮，等小朋友点击
-              isAnimating = false;
-              document.getElementById('dialogText').textContent = '👇 点下面的按钮，把它们放到一起！';
-              document.getElementById('countHintBtn').textContent = '✨ 放到一起！';
-              document.getElementById('countHintBtn').style.display = 'block';
-              document.getElementById('countHintBtn').onclick = function() {
+              // 数数模式：对话框直接变成可点击的"放到一起"
+              document.getElementById('dialogText').textContent = '👇 点击下方，把它们放到一起！';
+              const btn = document.getElementById('countHintBtn');
+              btn.textContent = '✨ 点击此处，放到一起！';
+              btn.style.display = 'block';
+              btn.onclick = function() {
                 if (isStale()) return;
                 this.style.display = 'none';
-                document.getElementById('dialogText').textContent = '✨ 把它们放到一起！';
+                document.getElementById('dialogText').textContent = '✨ 放到一起啦！';
                 elsaSpeak('把它们放到一起吧！');
-                // 不等语音回调，直接开始合并动画（语音和动画同步进行）
                 setTimeout(() => {
                   if (isStale()) return;
                   startMergeAndCount();
                 }, 300);
               };
             } else {
-              // 选择模式：显示"我知道！"按钮，点击后出选项
-              isAnimating = false;
+              // 选择模式：在算式下方显示"我知道答案"按钮
               const optCount = mode === 'choose2' ? 2 : 3;
-              document.getElementById('countHintBtn').textContent = '🙋 我知道答案！';
-              document.getElementById('countHintBtn').style.display = 'block';
-              document.getElementById('countHintBtn').onclick = function() {
+              document.getElementById('dialogText').textContent = '想一想，答案是几？';
+              // 用 optionsArea 来放按钮（在算式下方）
+              const optArea = document.getElementById('optionsArea');
+              optArea.innerHTML = '';
+              const knowBtn = document.createElement('button');
+              knowBtn.className = 'count-hint-btn';
+              knowBtn.style.display = 'block';
+              knowBtn.style.margin = '10px auto';
+              knowBtn.style.background = 'rgba(100,181,246,0.25)';
+              knowBtn.style.borderColor = 'rgba(100,181,246,0.5)';
+              knowBtn.style.fontSize = '18px';
+              knowBtn.style.padding = '12px 32px';
+              knowBtn.textContent = '🙋 我知道答案！';
+              knowBtn.onclick = function() {
                 if (isStale()) return;
-                this.style.display = 'none';
-                document.getElementById('countDisplay').textContent = '';
-                showOptions(optCount);
+                // 替换为"请选择答案"提示 + 选项
+                optArea.innerHTML = '';
+                const hint = document.createElement('div');
+                hint.style.cssText = 'text-align:center;color:#b3e5fc;font-size:15px;margin-bottom:8px;';
+                hint.textContent = '👇 请选择答案';
+                optArea.appendChild(hint);
+                const optWrap = document.createElement('div');
+                optWrap.style.cssText = 'display:flex;justify-content:center;gap:15px;';
+                optArea.appendChild(optWrap);
+                showOptionsInContainer(optCount, optWrap);
                 canAnswer = true;
               };
+              optArea.appendChild(knowBtn);
             }
+          }, readDelay);
           });
         });
       }, 200);
@@ -1951,6 +1983,42 @@ function showOptions(optCount) {
     btn.appendChild(miniFlakes);
     btn.addEventListener('click', () => checkAnswer(val, btn));
     optionsArea.appendChild(btn);
+  });
+}
+
+// 渲染选项到指定容器（用于"我知道答案"替换后）
+function showOptionsInContainer(optCount, container) {
+  optCount = optCount || 3;
+  const level = LEVELS[currentLevel];
+  const emoji = level.flakeEmoji;
+
+  let options = [answer];
+  const makeDistractor = () => {
+    let d;
+    do {
+      d = answer + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 2) + 1);
+    } while (d < 1 || d > 10 || options.includes(d));
+    return d;
+  };
+  for (let i = 1; i < optCount; i++) {
+    options.push(makeDistractor());
+  }
+  options.sort(() => Math.random() - 0.5);
+
+  options.forEach(val => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.dataset.value = val;
+    const numSpan = document.createElement('div');
+    numSpan.className = 'num';
+    numSpan.textContent = val;
+    const miniFlakes = document.createElement('div');
+    miniFlakes.className = 'mini-flakes';
+    miniFlakes.textContent = emoji.repeat(val);
+    btn.appendChild(numSpan);
+    btn.appendChild(miniFlakes);
+    btn.addEventListener('click', () => checkAnswer(val, btn));
+    container.appendChild(btn);
   });
 }
 
