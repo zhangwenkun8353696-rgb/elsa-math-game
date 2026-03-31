@@ -1033,16 +1033,17 @@ function checkTTSAvailable() {
 // 播放单个内嵌音频片段，完成后回调
 function playClip(key, callback) {
   if (!AUDIO_DATA[key]) {
-    if (callback) setTimeout(callback, 200);
+    if (callback) setTimeout(callback, 50);
     return;
   }
   const audio = new Audio(AUDIO_DATA[key]);
+  audio.playbackRate = 1.25; // 加快语速
   let done = false;
-  audio.onended = () => { if (!done) { done = true; if (callback) setTimeout(callback, 80); } };
-  audio.onerror = () => { if (!done) { done = true; if (callback) setTimeout(callback, 100); } };
-  // 超时保护
-  setTimeout(() => { if (!done) { done = true; if (callback) callback(); } }, 3000);
-  audio.play().catch(() => { if (!done) { done = true; if (callback) setTimeout(callback, 100); } });
+  audio.onended = () => { if (!done) { done = true; if (callback) setTimeout(callback, 20); } };
+  audio.onerror = () => { if (!done) { done = true; if (callback) setTimeout(callback, 50); } };
+  // 超时保护（足够长以覆盖最长的片段）
+  setTimeout(() => { if (!done) { done = true; if (callback) callback(); } }, 5000);
+  audio.play().catch(() => { if (!done) { done = true; if (callback) setTimeout(callback, 50); } });
 }
 
 // 顺序播放多个音频片段（拼接成句子）
@@ -1050,7 +1051,7 @@ function playClipSequence(keys, callback) {
   let idx = 0;
   function next() {
     if (idx >= keys.length) {
-      if (callback) setTimeout(callback, 150);
+      if (callback) setTimeout(callback, 80);
       return;
     }
     playClip(keys[idx], () => { idx++; next(); });
