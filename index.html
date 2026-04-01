@@ -1916,7 +1916,8 @@ async function nextQuestion() {
   const minDelayPromise = waitMs(3500).then(() => { minDelayDone = true; showQuestionActions(); });
   const maxDelayPromise = waitMs(10000).then(() => { maxDelayDone = true; showQuestionActions(); });
 
-  await Promise.race([speechPromise, minDelayPromise, maxDelayPromise]);
+  // 等待所有Promise完成，确保语音读完
+  await Promise.all([speechPromise, minDelayPromise, maxDelayPromise]);
 }
 
 // 逐个显示雪花（带动画间隔），返回 Promise
