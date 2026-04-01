@@ -448,6 +448,13 @@
     gap: 15px;
   }
 
+  /* "我知道答案" / "请选择答案" 独立提示区 */
+  .know-answer-area {
+    text-align: center;
+    padding: 8px 20px 4px;
+    min-height: 0;
+  }
+
   /* 选项区域 */
   .options-area {
     padding: 15px 20px;
@@ -889,6 +896,9 @@
       <div class="merge-area" id="mergeArea"></div>
     </div>
 
+    <!-- 我知道答案 / 请选择答案 提示区（在选项上方，独立区域） -->
+    <div class="know-answer-area" id="knowAnswerArea"></div>
+
     <!-- 选项区域 -->
     <div class="options-area" id="optionsArea"></div>
   </div>
@@ -1136,6 +1146,8 @@ function stopCurrentSpeech() {
       audio.currentTime = 0;
       audio.onended = null;
       audio.onerror = null;
+      audio.oncanplaythrough = null;
+      audio.src = '';
     } catch (e) {}
   });
   activeSpeechAudios = [];
@@ -1154,7 +1166,8 @@ function playClipNow(key, generation) {
       return;
     }
 
-    const audio = new Audio(AUDIO_DATA[key]);
+    // 复用或创建 Audio 对象（减少移动端Audio对象创建压力）
+    const audio = new Audio();
     audio.preload = 'auto';
     audio.playbackRate = 1.12;
     audio.volume = 1;
@@ -1170,13 +1183,29 @@ function playClipNow(key, generation) {
       removeActiveSpeechAudio(audio);
       audio.onended = null;
       audio.onerror = null;
+      audio.oncanplaythrough = null;
       setTimeout(resolve, delay);
     };
 
     audio.onended = () => finish(90);
     audio.onerror = () => finish(120);
-    setTimeout(() => finish(5200), 5200);
-    audio.play().catch(() => finish(120));
+    // 超时从 5200ms 增大到 8000ms
+    setTimeout(() => finish(80), 8000);
+
+    // 先设置 src 让浏览器开始解码，等 canplaythrough 再播放
+    audio.oncanplaythrough = function() {
+      audio.oncanplaythrough = null;
+      if (done || generation !== speechGeneration) { finish(40); return; }
+      audio.play().catch(() => finish(120));
+    };
+    audio.src = AUDIO_DATA[key];
+    // 兜底：如果 canplaythrough 迟迟不触发，500ms 后直接尝试播放
+    setTimeout(() => {
+      if (!done && audio.oncanplaythrough) {
+        audio.oncanplaythrough = null;
+        audio.play().catch(() => finish(120));
+      }
+    }, 500);
   });
 }
 
@@ -1197,7 +1226,7 @@ function playClip(key, callback) {
   queueSpeechTask((generation) => playClipNow(key, generation), callback);
 }
 
-// 顺序播放多个音频片段（拼接成句子）
+// 顺序播放多个音频片段（拼接成句子，片段间加间隔避免移动端音频丢失）
 function playClipSequence(keys, callback) {
   const safeKeys = (keys || []).filter(Boolean);
   queueSpeechTask(async (generation) => {
@@ -1205,7 +1234,7 @@ function playClipSequence(keys, callback) {
       if (generation !== speechGeneration) return;
       await playClipNow(safeKeys[idx], generation);
       if (idx < safeKeys.length - 1) {
-        await waitMs(100);
+        await waitMs(150);
       }
     }
   }, callback);
@@ -1698,6 +1727,7 @@ function startLevel() {
   showScreen('game-screen');
   document.getElementById('dialogText').textContent = '艾莎正在准备中...✨';
   document.getElementById('optionsArea').innerHTML = '';
+  document.getElementById('knowAnswerArea').innerHTML = '';
 
   // 音频已内嵌，无需预加载，直接出题
   nextQuestion();
@@ -1749,6 +1779,7 @@ function nextQuestion() {
   document.getElementById('snowflakeDisplay').style.display = 'flex';
   document.getElementById('countHintBtn').style.display = 'none';
   document.getElementById('optionsArea').innerHTML = '';
+  document.getElementById('knowAnswerArea').innerHTML = '';
 
   // 重置算式
   document.getElementById('formulaDisplay').classList.remove('show');
@@ -1823,22 +1854,27 @@ function nextQuestion() {
             } else {
               const optCount = mode === 'choose2' ? 2 : 3;
               document.getElementById('dialogText').textContent = '想一想，答案是几？';
+              const knowArea = document.getElementById('knowAnswerArea');
               const optArea = document.getElementById('optionsArea');
+              knowArea.innerHTML = '';
               optArea.innerHTML = '';
 
               const knowBtn = document.createElement('button');
               knowBtn.className = 'count-hint-btn know-answer-btn';
               knowBtn.style.display = 'block';
+              knowBtn.style.margin = '0 auto';
               knowBtn.textContent = '我知道答案';
               knowBtn.onclick = function() {
                 if (isStale()) return;
-                optArea.innerHTML = '';
-
+                // 替换按钮为"请选择答案"提示
+                knowArea.innerHTML = '';
                 const hint = document.createElement('div');
                 hint.className = 'options-hint';
                 hint.textContent = '请选择答案';
-                optArea.appendChild(hint);
+                knowArea.appendChild(hint);
 
+                // 选项放到 optionsArea
+                optArea.innerHTML = '';
                 const optWrap = document.createElement('div');
                 optWrap.className = 'options-row';
                 optArea.appendChild(optWrap);
@@ -1846,7 +1882,7 @@ function nextQuestion() {
                 canAnswer = true;
               };
 
-              optArea.appendChild(knowBtn);
+              knowArea.appendChild(knowBtn);
             }
           }
 
@@ -1858,12 +1894,12 @@ function nextQuestion() {
           setTimeout(() => {
             minDelayDone = true;
             showQuestionActions();
-          }, 2800);
+          }, 3500);
 
           setTimeout(() => {
             maxDelayDone = true;
             showQuestionActions();
-          }, 5800);
+          }, 10000);
 
         });
       }, 200);
