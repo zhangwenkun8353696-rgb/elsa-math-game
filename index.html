@@ -1112,207 +1112,115 @@ function unlockTTS() {
   }, 300);
 }
 
-// 核心语音函数：说完再回调
-// 检测 TTS 是否真正可用
-function checkTTSAvailable() {
-  if (!window.speechSynthesis) return false;
-  if (!ttsUnlocked) return false;  // 手机端必须先解锁
-  try {
-    const voices = speechSynthesis.getVoices();
-    return voices.length > 0;
-  } catch(e) { return false; }
-}
+// ===== 极简音频系统（v4 完全重写）=====
+// 设计原则：不用 callback，全部 Promise/await，不用队列，直接播放
 
-// ===== 全新音频队列系统（v3 重写）=====
-// 核心设计：用 async/await while 循环替代 Promise 链，彻底消除竞态
-
-let speechGeneration = 0;        // 每次 stopCurrentSpeech 递增，用于废弃旧任务
-let activeSpeechAudios = [];     // 当前活跃的 Audio 对象
-let _aq_tasks = [];              // 任务队列
-let _aq_running = false;         // 队列是否正在处理
-let _aq_currentReject = null;    // 当前任务的 reject 句柄（用于强制中断）
-
-function removeActiveSpeechAudio(audio) {
-  activeSpeechAudios = activeSpeechAudios.filter(item => item !== audio);
-}
-
-// 停止所有语音并清空队列
-function stopCurrentSpeech() {
-  speechGeneration++;
-  // 清空待执行的任务队列
-  _aq_tasks = [];
-  // 中断当前正在执行的任务
-  if (_aq_currentReject) {
-    try { _aq_currentReject('stopped'); } catch(e) {}
-    _aq_currentReject = null;
-  }
-  // 取消 TTS
-  if (window.speechSynthesis) {
-    try { speechSynthesis.cancel(); } catch(e) {}
-  }
-  // 停止所有 Audio 对象
-  activeSpeechAudios.forEach(audio => {
-    try {
-      audio.pause();
-      audio.currentTime = 0;
-      audio.onended = null;
-      audio.onerror = null;
-      audio.oncanplaythrough = null;
-      audio.src = '';
-    } catch (e) {}
-  });
-  activeSpeechAudios = [];
-}
+let _currentAudio = null;   // 当前正在播放的 Audio 对象
+let _speechAbort = false;    // 中止标志
 
 function waitMs(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// 队列处理器——严格线性执行
-async function _aq_process() {
-  if (_aq_running) return;
-  _aq_running = true;
-  while (_aq_tasks.length > 0) {
-    const { taskFn, callback, gen } = _aq_tasks.shift();
-    // 如果 generation 已经变了（stopCurrentSpeech 被调用），跳过此任务
-    if (gen !== speechGeneration) continue;
+// 停止所有正在播放的语音
+function stopCurrentSpeech() {
+  _speechAbort = true;
+  // 停止 TTS
+  if (window.speechSynthesis) {
+    try { speechSynthesis.cancel(); } catch(e) {}
+  }
+  // 停止 Audio
+  if (_currentAudio) {
     try {
-      await new Promise((resolve, reject) => {
-        _aq_currentReject = reject;
-        taskFn(gen).then(resolve).catch(resolve); // 无论成功失败都 resolve
-      });
-    } catch(e) {
-      // 被 stopCurrentSpeech 中断，跳过
-    }
-    _aq_currentReject = null;
-    // 再次检查 generation
-    if (gen !== speechGeneration) continue;
-    // 触发 callback
-    if (callback) {
-      try { callback(); } catch(e) {}
-    }
+      _currentAudio.pause();
+      _currentAudio.onended = null;
+      _currentAudio.onerror = null;
+      _currentAudio.src = '';
+    } catch(e) {}
+    _currentAudio = null;
   }
-  _aq_running = false;
 }
 
-// 向队列添加任务
-function queueSpeechTask(taskFn, callback) {
-  _aq_tasks.push({ taskFn, callback, gen: speechGeneration });
-  _aq_process();
+// 检测 TTS 是否可用
+function checkTTSAvailable() {
+  if (!window.speechSynthesis) return false;
+  if (!ttsUnlocked) return false;
+  try { return speechSynthesis.getVoices().length > 0; } catch(e) { return false; }
 }
 
-// TTS 朗读函数
-function ttsSpeak(text, callback) {
-  if (!window.speechSynthesis || !ttsUnlocked) {
-    if (callback) setTimeout(callback, 500);
-    return;
-  }
-  queueSpeechTask(async (gen) => {
-    if (gen !== speechGeneration) return;
-    // 不在这里 cancel——stopCurrentSpeech 已经做了。直接说。
-    // 给浏览器一点点喘息时间（解决 cancel 后立即 speak 不生效的 bug）
-    await waitMs(50);
-    if (gen !== speechGeneration) return;
-    await new Promise((resolve) => {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN';
-      utterance.rate = 0.9;
-      utterance.pitch = 1.2;
-      if (ttsVoice) utterance.voice = ttsVoice;
-      let settled = false;
-      const startTime = Date.now();
-      function done() {
-        if (settled) return;
-        settled = true;
-        // 最小播放时长保护
-        const elapsed = Date.now() - startTime;
-        const minDuration = Math.max(text.length * 150, 800);
-        const remaining = Math.max(0, minDuration - elapsed);
-        setTimeout(resolve, remaining);
-      }
-      utterance.onend = done;
-      utterance.onerror = done;
-      try {
-        speechSynthesis.speak(utterance);
-      } catch(e) {
-        done();
-        return;
-      }
-      // 超时保护：15秒后强制结束
-      setTimeout(done, 15000);
-    });
-  }, callback);
-}
-
-// 播放单个内嵌音频片段
-function playClipNow(key, generation) {
+// 播放单个内嵌音频片段（返回 Promise）
+function playOneClip(key) {
   return new Promise(resolve => {
-    if (!AUDIO_DATA[key] || generation !== speechGeneration) {
-      resolve();
-      return;
-    }
-
+    if (!AUDIO_DATA[key]) { resolve(); return; }
     const audio = new Audio();
-    audio.preload = 'auto';
+    _currentAudio = audio;
     audio.playbackRate = 1.12;
     audio.volume = 1;
     audio.playsInline = true;
-    audio.setAttribute('playsinline', 'true');
-    audio.setAttribute('webkit-playsinline', 'true');
-    activeSpeechAudios.push(audio);
 
     let done = false;
-    const finish = (delay) => {
+    function finish() {
       if (done) return;
       done = true;
-      removeActiveSpeechAudio(audio);
+      _currentAudio = null;
       audio.onended = null;
       audio.onerror = null;
       audio.oncanplaythrough = null;
       try { audio.pause(); audio.src = ''; } catch(e) {}
-      setTimeout(resolve, delay || 0);
-    };
+      resolve();
+    }
 
-    audio.onended = () => finish(60);
-    audio.onerror = () => finish(80);
-    // 超时保护
-    setTimeout(() => finish(40), 8000);
+    audio.onended = finish;
+    audio.onerror = finish;
+    setTimeout(finish, 8000); // 超时保护
 
     audio.oncanplaythrough = function() {
       audio.oncanplaythrough = null;
-      if (done || generation !== speechGeneration) { finish(20); return; }
-      audio.play().catch(() => finish(80));
+      if (done || _speechAbort) { finish(); return; }
+      audio.play().catch(finish);
     };
     audio.src = AUDIO_DATA[key];
-    // 兜底：500ms 后直接尝试播放
+    // 兜底
     setTimeout(() => {
       if (!done && audio.oncanplaythrough) {
         audio.oncanplaythrough = null;
-        if (generation !== speechGeneration) { finish(20); return; }
-        audio.play().catch(() => finish(80));
+        if (_speechAbort) { finish(); return; }
+        audio.play().catch(finish);
       }
     }, 500);
   });
 }
 
-function playClip(key, callback) {
-  queueSpeechTask((generation) => playClipNow(key, generation), callback);
-}
-
-// 顺序播放多个音频片段
-function playClipSequence(keys, callback) {
-  const safeKeys = (keys || []).filter(Boolean);
-  queueSpeechTask(async (generation) => {
-    for (let idx = 0; idx < safeKeys.length; idx++) {
-      if (generation !== speechGeneration) return;
-      await playClipNow(safeKeys[idx], generation);
-      if (idx < safeKeys.length - 1) {
-        await waitMs(120);
-      }
+// TTS 朗读（返回 Promise）
+function ttsPromise(text) {
+  return new Promise(resolve => {
+    if (!window.speechSynthesis || !ttsUnlocked) {
+      // TTS 不可用，给一个读取时间
+      setTimeout(resolve, Math.max(text.length * 200, 1000));
+      return;
     }
-  }, callback);
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'zh-CN';
+    utterance.rate = 0.9;
+    utterance.pitch = 1.2;
+    if (ttsVoice) utterance.voice = ttsVoice;
+    let settled = false;
+    const startTime = Date.now();
+    function done() {
+      if (settled) return;
+      settled = true;
+      // 最小播放时长（防止瞬间 onerror）
+      const elapsed = Date.now() - startTime;
+      const minMs = Math.max(text.length * 150, 800);
+      const wait = Math.max(0, minMs - elapsed);
+      setTimeout(resolve, wait);
+    }
+    utterance.onend = done;
+    utterance.onerror = done;
+    try { speechSynthesis.speak(utterance); } catch(e) { done(); return; }
+    setTimeout(done, 15000); // 超时保护
+  });
 }
-
 
 // 物品名 emoji -> 音频 key 映射
 const itemAudioKey = {
@@ -1320,72 +1228,54 @@ const itemAudioKey = {
   '🏰': 'i_chengbao', '💎': 'i_zuanshi', '🌈': 'i_caihong', '🎀': 'i_hudiejie',
   '👑': 'i_huangguan', '🏆': 'i_jiangbei'
 };
-// 数字 -> 音频 key
 const numAudioKey = { 1:'n1', 2:'n2', 3:'n3', 4:'n4', 5:'n5', 6:'n6', 7:'n7', 8:'n8', 9:'n9' };
 
-// ===== 核心语音函数（重写）=====
-// 解析文本，拆成音频片段序列播放
+// ===== 核心语音函数：elsaSpeak 返回 Promise =====
+// 兼容旧调用方式：elsaSpeak(text) 或 elsaSpeak(text, callback)
 function elsaSpeak(text, callback) {
-  if (!text) { if (callback) setTimeout(callback, 300); return; }
+  const promise = _elsaSpeakAsync(text);
+  if (callback) {
+    promise.then(() => { try { callback(); } catch(e) {} });
+  }
+  return promise;
+}
 
-  // 先尝试匹配预录完整语音
+// 真正的异步语音播放
+async function _elsaSpeakAsync(text) {
+  if (!text) { await waitMs(200); return; }
+  if (_speechAbort) return;
+
+  // 1. 预录完整语音
   const openKeys = {'小公主，来看看！':'open1','艾莎要变魔法啦！':'open2','准备好了吗？':'open3',
     '新的题来啦！':'open4','再来一题！':'open5','继续加油！':'open6','这次试试看！':'open7',
     '来看这个！':'open8','又有新题啦！':'open9','加油呀！':'open10',
     '再想想呀，不着急！':'enc1','没关系的，再试一次！':'enc2','点雪花数一数就知道啦！':'enc3',
     '把它们放到一起吧！':'merge','现在点一个数一个吧！':'countstart'};
 
-  if (openKeys[text]) {
-    const key = openKeys[text];
-    if (AUDIO_DATA[key]) {
-      playClip(key, callback);
-    } else {
-      // 预录音频缺失，用 TTS 兜底
-      ttsSpeak(text, callback);
-    }
+  if (openKeys[text] && AUDIO_DATA[openKeys[text]]) {
+    await playOneClip(openKeys[text]);
     return;
   }
 
-  // 匹配读题模式："X个Y，加Z个Y，等于几呢？"
+  // 2. 读题模式："X个Y，加Z个Y，等于几呢？"
   const readMatch = text.match(/^(.+)个(.+)，加(.+)个(.+)，等于几呢？$/);
   if (readMatch) {
-    const a = readMatch[1]; // 中文数字
-    const item1 = readMatch[2];
-    const b = readMatch[3];
     const numMap = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9};
-    const aNum = numMap[a];
-    const bNum = numMap[b];
-
-    // 优先查找完整录音 key: q_A_B_物品名
+    const aNum = numMap[readMatch[1]];
+    const bNum = numMap[readMatch[3]];
+    const item1 = readMatch[2];
+    // 优先完整录音
     const fullKey = 'q_' + aNum + '_' + bNum + '_' + item1;
     if (AUDIO_DATA[fullKey]) {
-      playClip(fullKey, callback);
+      await playOneClip(fullKey);
       return;
     }
-
-    // 兜底：拼接播放（仅当拼接片段存在时）
-    const aKey = numAudioKey[aNum];
-    const bKey = numAudioKey[bNum];
-    const iKey = itemAudioKey[Object.keys(itemAudioKey).find(k => {
-      const names = {'❄️':'雪花','⭐':'星星','⛄':'雪人','🦌':'小鹿','🏰':'城堡','💎':'钻石','🌈':'彩虹','🎀':'蝴蝶结','👑':'皇冠','🏆':'奖杯'};
-      return names[k] === item1;
-    })];
-    const concatKeys = [aKey, 'ge', iKey, 'jia', bKey, 'ge', iKey, 'dengyuji'];
-    // 检查拼接片段是否真的都存在于 AUDIO_DATA
-    const hasAllClips = concatKeys.every(k => k && AUDIO_DATA[k]);
-    if (hasAllClips && checkTTSAvailable()) {
-      // 有拼接片段但无预录完整音频（前面已判断），优先用 TTS（更流畅，8个片段拼接在手机上太慢）
-      ttsSpeak(readMatch[0], callback);
-    } else if (hasAllClips) {
-      playClipSequence(concatKeys, callback);
-    } else {
-      // 拼接片段缺失，用 TTS 兜底
-      ttsSpeak(readMatch[0], callback);
-    }
+    // 用 TTS 读（最可靠的兜底）
+    await ttsPromise(text);
     return;
   }
 
-  // 匹配答对模式："X加Y等于Z！太棒了！" 等
+  // 3. 答对模式："X加Y等于Z！太棒了！"
   const correctMatch = text.match(/^(.+)加(.+)等于(.+)！(.+)$/);
   if (correctMatch) {
     const numMap = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9};
@@ -1396,29 +1286,36 @@ function elsaSpeak(text, callback) {
     const praiseKeys = {'太棒了！':'taibangle','你真聪明！':'nizhenconming',
       '小公主真厉害！':'xiaogongzhuzhenlihai','太了不起了！':'tailebule','完美！':'wanmei'};
     const pKey = praiseKeys[praise] || 'taibangle';
-    const keys = [aKey, 'jia', bKey, 'dengyu', cKey, pKey];
-    const hasAllClips = keys.every(k => k && AUDIO_DATA[k]);
-    if (hasAllClips && checkTTSAvailable()) {
-      // 优先用 TTS（拼接多个片段在手机上不可靠）
-      ttsSpeak(correctMatch[0], callback);
-    } else if (hasAllClips) {
-      playClipSequence(keys, callback);
-    } else {
-      // 拼接片段缺失，用 TTS 兜底
-      ttsSpeak(correctMatch[0], callback);
+    const keys = [aKey, 'jia', bKey, 'dengyu', cKey, pKey].filter(k => k && AUDIO_DATA[k]);
+    if (keys.length === 6) {
+      // 全部片段都有，拼接播放
+      for (const k of keys) {
+        if (_speechAbort) return;
+        await playOneClip(k);
+        await waitMs(80);
+      }
+      return;
     }
+    // 片段不全，用 TTS
+    await ttsPromise(text);
     return;
   }
 
-  // 兜底：尝试 TTS 朗读，不行就播放提示音 + 给阅读时间
+  // 4. 其他文本
+  if (openKeys[text] && !AUDIO_DATA[openKeys[text]]) {
+    // 预录音频 key 存在但数据缺失
+    await ttsPromise(text);
+    return;
+  }
+
+  // 5. 纯 TTS 兜底
   if (checkTTSAvailable()) {
-    ttsSpeak(text, callback);
+    await ttsPromise(text);
   } else {
-    queueSpeechTask(async () => {
-      ensureAudio();
-      playTone(880, 0.15, 'sine', 0.08);
-      await waitMs(Math.max(text.length * 220, 900));
-    }, callback);
+    // TTS 也不可用，播个提示音 + 等待阅读时间
+    ensureAudio();
+    playTone(880, 0.15, 'sine', 0.08);
+    await waitMs(Math.max(text.length * 220, 900));
   }
 }
 
@@ -1852,7 +1749,7 @@ function updateStarsBar() {
 }
 
 // ===== 出题 =====
-function nextQuestion() {
+async function nextQuestion() {
   const level = LEVELS[currentLevel];
   if (currentQuestion >= currentPairs.length) {
     showLevelComplete();
@@ -1861,6 +1758,7 @@ function nextQuestion() {
 
   // 停止上一题残留的语音播放（防止上一题语音和本题语音互相干扰）
   stopCurrentSpeech();
+  _speechAbort = false;  // 重置中止标志，允许本题语音播放
 
   questionId++; // 递增，防止旧回调干扰
   const myQid = questionId;
@@ -1915,105 +1813,96 @@ function nextQuestion() {
   const openLine = openLines[currentQuestion % openLines.length];
   document.getElementById('dialogText').textContent = openLine;
 
-  elsaSpeak(openLine, () => {
-    if (isStale()) return;
-    // 第2步：左组物品逐个出现
-    showFlakesSequentially('groupA', numA, emoji, () => {
-      if (isStale()) return;
-      document.getElementById('formulaDisplay').classList.add('show');
-      document.getElementById('formulaA').textContent = numA;
-      document.getElementById('formulaA').classList.add('show');
+  await elsaSpeak(openLine);
+  if (isStale()) return;
 
-      setTimeout(() => {
+  // 第2步：左组物品逐个出现
+  await showFlakesSequentially('groupA', numA, emoji);
+  if (isStale()) return;
+
+  document.getElementById('formulaDisplay').classList.add('show');
+  document.getElementById('formulaA').textContent = numA;
+  document.getElementById('formulaA').classList.add('show');
+
+  await waitMs(200);
+  if (isStale()) return;
+
+  // 第3步：右组物品逐个出现
+  await showFlakesSequentially('groupB', numB, emoji);
+  if (isStale()) return;
+
+  document.getElementById('formulaPlus').classList.add('show');
+  document.getElementById('formulaB').textContent = numB;
+  document.getElementById('formulaB').classList.add('show');
+
+  // 第4步：读题（不依赖回调驱动流程，语音和UI分离）
+  const readQuestion = numToChinese(numA) + '个' + itemName + '，加' + numToChinese(numB) + '个' + itemName + '，等于几呢？';
+  document.getElementById('dialogText').textContent = numA + '个' + itemName + ' + ' + numB + '个' + itemName + ' = ？';
+  document.getElementById('formulaEquals').classList.add('show');
+  document.getElementById('formulaAnswer').textContent = '?';
+  document.getElementById('formulaAnswer').classList.add('show');
+
+  // 读题结束后再放出操作区，减少语音被点击后的下一段播报截断
+  let readUiShown = false;
+  let minDelayDone = false;
+  let speechDone = false;
+  let maxDelayDone = false;
+
+  function showQuestionActions() {
+    if (readUiShown || isStale()) return;
+    if ((!speechDone || !minDelayDone) && !maxDelayDone) return;
+
+    readUiShown = true;
+    isAnimating = false;
+
+    if (mode === 'count') {
+      document.getElementById('dialogText').textContent = '点击图案，把它们放到一起';
+      enableMergeTapHint(isStale);
+    } else {
+      const optCount = mode === 'choose2' ? 2 : 3;
+      document.getElementById('dialogText').textContent = '想一想，答案是几？';
+      const knowArea = document.getElementById('knowAnswerArea');
+      const optArea = document.getElementById('optionsArea');
+      knowArea.innerHTML = '';
+      optArea.innerHTML = '';
+
+      const knowBtn = document.createElement('button');
+      knowBtn.className = 'count-hint-btn know-answer-btn';
+      knowBtn.style.display = 'block';
+      knowBtn.style.margin = '0 auto';
+      knowBtn.textContent = '我知道答案';
+      knowBtn.onclick = function() {
         if (isStale()) return;
-        // 第3步：右组物品逐个出现
-        showFlakesSequentially('groupB', numB, emoji, () => {
-          if (isStale()) return;
-          document.getElementById('formulaPlus').classList.add('show');
-          document.getElementById('formulaB').textContent = numB;
-          document.getElementById('formulaB').classList.add('show');
+        // 替换按钮为"请选择答案"提示
+        knowArea.innerHTML = '';
+        const hint = document.createElement('div');
+        hint.className = 'options-hint';
+        hint.textContent = '请选择答案';
+        knowArea.appendChild(hint);
 
-          // 第4步：读题（不依赖回调驱动流程，语音和UI分离）
-          const readQuestion = numToChinese(numA) + '个' + itemName + '，加' + numToChinese(numB) + '个' + itemName + '，等于几呢？';
-          document.getElementById('dialogText').textContent = numA + '个' + itemName + ' + ' + numB + '个' + itemName + ' = ？';
-          document.getElementById('formulaEquals').classList.add('show');
-          document.getElementById('formulaAnswer').textContent = '?';
-          document.getElementById('formulaAnswer').classList.add('show');
+        // 选项放到 optionsArea
+        optArea.innerHTML = '';
+        const optWrap = document.createElement('div');
+        optWrap.className = 'options-row';
+        optArea.appendChild(optWrap);
+        showOptionsInContainer(optCount, optWrap);
+        canAnswer = true;
+      };
 
-          // 读题结束后再放出操作区，减少语音被点击后的下一段播报截断
-          let readUiShown = false;
-          let minDelayDone = false;
-          let speechDone = false;
-          let maxDelayDone = false;
+      knowArea.appendChild(knowBtn);
+    }
+  }
 
-          function showQuestionActions() {
-            if (readUiShown || isStale()) return;
-            if ((!speechDone || !minDelayDone) && !maxDelayDone) return;
+  // 并行等待：语音播放完成 或 最小延迟 或 最大延迟
+  const speechPromise = elsaSpeak(readQuestion).then(() => { speechDone = true; showQuestionActions(); });
+  const minDelayPromise = waitMs(3500).then(() => { minDelayDone = true; showQuestionActions(); });
+  const maxDelayPromise = waitMs(10000).then(() => { maxDelayDone = true; showQuestionActions(); });
 
-            readUiShown = true;
-            isAnimating = false;
-
-            if (mode === 'count') {
-              document.getElementById('dialogText').textContent = '点击图案，把它们放到一起';
-              enableMergeTapHint(isStale);
-            } else {
-              const optCount = mode === 'choose2' ? 2 : 3;
-              document.getElementById('dialogText').textContent = '想一想，答案是几？';
-              const knowArea = document.getElementById('knowAnswerArea');
-              const optArea = document.getElementById('optionsArea');
-              knowArea.innerHTML = '';
-              optArea.innerHTML = '';
-
-              const knowBtn = document.createElement('button');
-              knowBtn.className = 'count-hint-btn know-answer-btn';
-              knowBtn.style.display = 'block';
-              knowBtn.style.margin = '0 auto';
-              knowBtn.textContent = '我知道答案';
-              knowBtn.onclick = function() {
-                if (isStale()) return;
-                // 替换按钮为"请选择答案"提示
-                knowArea.innerHTML = '';
-                const hint = document.createElement('div');
-                hint.className = 'options-hint';
-                hint.textContent = '请选择答案';
-                knowArea.appendChild(hint);
-
-                // 选项放到 optionsArea
-                optArea.innerHTML = '';
-                const optWrap = document.createElement('div');
-                optWrap.className = 'options-row';
-                optArea.appendChild(optWrap);
-                showOptionsInContainer(optCount, optWrap);
-                canAnswer = true;
-              };
-
-              knowArea.appendChild(knowBtn);
-            }
-          }
-
-          elsaSpeak(readQuestion, () => {
-            speechDone = true;
-            showQuestionActions();
-          });
-
-          setTimeout(() => {
-            minDelayDone = true;
-            showQuestionActions();
-          }, 3500);
-
-          setTimeout(() => {
-            maxDelayDone = true;
-            showQuestionActions();
-          }, 10000);
-
-        });
-      }, 200);
-    });
-  });
+  await Promise.race([speechPromise, minDelayPromise, maxDelayPromise]);
 }
 
-// 逐个显示雪花（带动画间隔），完成后回调
-function showFlakesSequentially(groupId, count, emoji, callback) {
+// 逐个显示雪花（带动画间隔），返回 Promise
+async function showFlakesSequentially(groupId, count, emoji) {
   const group = document.getElementById(groupId);
   const flakes = [];
   for (let i = 0; i < count; i++) {
@@ -2024,17 +1913,13 @@ function showFlakesSequentially(groupId, count, emoji, callback) {
     flakes.push(flake);
   }
   let idx = 0;
-  function showNext() {
-    if (idx >= flakes.length) {
-      setTimeout(callback, 200);
-      return;
-    }
-    flakes[idx].classList.add('show');
+  for (const flake of flakes) {
+    flake.classList.add('show');
     playTone(400 + idx * 80, 0.15, 'sine', 0.06);
     idx++;
-    setTimeout(showNext, 300);
+    await waitMs(300);
   }
-  setTimeout(showNext, 150);
+  await waitMs(200);
 }
 
 function resetInteractiveHints() {
@@ -2058,17 +1943,16 @@ function enableMergeTapHint(isStale) {
   const groupB = document.getElementById('groupB');
   let merged = false;
 
-  const startFromTap = () => {
+  const startFromTap = async () => {
     if (merged || isStale()) return;
     merged = true;
     isAnimating = true;
     resetInteractiveHints();
     document.getElementById('countHintBtn').style.display = 'none';
     document.getElementById('dialogText').textContent = '✨ 放到一起啦！';
-    elsaSpeak('把它们放到一起吧！', () => {
-      if (isStale()) return;
-      startMergeAndCount();
-    });
+    await elsaSpeak('把它们放到一起吧！');
+    if (isStale()) return;
+    startMergeAndCount();
   };
 
   [groupA, groupB].forEach(group => {
@@ -2188,7 +2072,7 @@ function handleCountTap(idx) {
       // 语音说出公式
       const praises = ['太棒了！', '你真聪明！', '小公主真厉害！', '太了不起了！', '完美！'];
       const praise = praises[currentQuestion % praises.length];
-      elsaSpeak(numToChinese(numA) + '加' + numToChinese(numB) + '等于' + numToChinese(answer) + '！' + praise, () => {
+      elsaSpeak(numToChinese(numA) + '加' + numToChinese(numB) + '等于' + numToChinese(answer) + '！' + praise).then(() => {
         setTimeout(() => {
           currentQuestion++;
           nextQuestion();
@@ -2356,7 +2240,7 @@ function showOptionsInContainer(optCount, container) {
 }
 
 // ===== 检查答案 =====
-function checkAnswer(val, btn) {
+async function checkAnswer(val, btn) {
   if (!canAnswer || isAnimating) return;
 
   if (val === answer) {
@@ -2377,13 +2261,12 @@ function checkAnswer(val, btn) {
     // 艾莎语音说出完整公式 + 鼓励
     const praises = ['太棒了！', '你真聪明！', '小公主真厉害！', '太了不起了！', '完美！'];
     const praise = praises[currentQuestion % praises.length];
-    elsaSpeak(numToChinese(numA) + '加' + numToChinese(numB) + '等于' + numToChinese(answer) + '！' + praise, () => {
-      // 等语音说完再进入下一题
-      setTimeout(() => {
-        currentQuestion++;
-        nextQuestion();
-      }, 500);
-    });
+    await elsaSpeak(numToChinese(numA) + '加' + numToChinese(numB) + '等于' + numToChinese(answer) + '！' + praise);
+
+    // 等语音说完再进入下一题
+    await waitMs(500);
+    currentQuestion++;
+    nextQuestion();
 
     // 魔法粒子特效
     createMagicBurst(btn);
