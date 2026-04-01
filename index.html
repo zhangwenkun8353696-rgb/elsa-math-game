@@ -1128,6 +1128,26 @@ function checkTTSAvailable() {
   return ttsAvailable;
 }
 
+// TTS 朗读函数（用于没有预录音频时的兜底）
+function ttsSpeak(text, callback) {
+  if (!window.speechSynthesis) {
+    if (callback) setTimeout(callback, 500);
+    return;
+  }
+  // 先取消之前的 TTS（防止堆积）
+  speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'zh-CN';
+  utterance.rate = 0.9;
+  utterance.pitch = 1.2;
+  if (ttsVoice) utterance.voice = ttsVoice;
+  utterance.onend = () => { if (callback) setTimeout(callback, 100); };
+  utterance.onerror = () => { if (callback) setTimeout(callback, 200); };
+  speechSynthesis.speak(utterance);
+  // 超时保护
+  setTimeout(() => { if (callback) callback(); }, 15000);
+}
+
 // ===== 内嵌音频播放系统（不依赖网络，100%可靠）=====
 
 let speechGeneration = 0;
@@ -1140,6 +1160,10 @@ function removeActiveSpeechAudio(audio) {
 
 function stopCurrentSpeech() {
   speechGeneration++;
+  // 同时取消 TTS
+  if (window.speechSynthesis) {
+    try { speechSynthesis.cancel(); } catch(e) {}
+  }
   activeSpeechAudios.forEach(audio => {
     try {
       audio.pause();
@@ -1263,7 +1287,13 @@ function elsaSpeak(text, callback) {
     '把它们放到一起吧！':'merge','现在点一个数一个吧！':'countstart'};
 
   if (openKeys[text]) {
-    playClip(openKeys[text], callback);
+    const key = openKeys[text];
+    if (AUDIO_DATA[key]) {
+      playClip(key, callback);
+    } else {
+      // 预录音频缺失，用 TTS 兜底
+      ttsSpeak(text, callback);
+    }
     return;
   }
 
@@ -1284,15 +1314,22 @@ function elsaSpeak(text, callback) {
       return;
     }
 
-    // 兜底：拼接播放
+    // 兜底：拼接播放（仅当拼接片段存在时）
     const aKey = numAudioKey[aNum];
     const bKey = numAudioKey[bNum];
     const iKey = itemAudioKey[Object.keys(itemAudioKey).find(k => {
       const names = {'❄️':'雪花','⭐':'星星','⛄':'雪人','🦌':'小鹿','🏰':'城堡','💎':'钻石','🌈':'彩虹','🎀':'蝴蝶结','👑':'皇冠','🏆':'奖杯'};
       return names[k] === item1;
-    })] || 'i_xuehua';
-    const keys = [aKey, 'ge', iKey, 'jia', bKey, 'ge', iKey, 'dengyuji'];
-    playClipSequence(keys, callback);
+    })];
+    const concatKeys = [aKey, 'ge', iKey, 'jia', bKey, 'ge', iKey, 'dengyuji'];
+    // 检查拼接片段是否真的都存在于 AUDIO_DATA
+    const hasAllClips = concatKeys.every(k => k && AUDIO_DATA[k]);
+    if (hasAllClips) {
+      playClipSequence(concatKeys, callback);
+    } else {
+      // 拼接片段缺失，用 TTS 兜底
+      ttsSpeak(readMatch[0], callback);
+    }
     return;
   }
 
@@ -1308,16 +1345,26 @@ function elsaSpeak(text, callback) {
       '小公主真厉害！':'xiaogongzhuzhenlihai','太了不起了！':'tailebule','完美！':'wanmei'};
     const pKey = praiseKeys[praise] || 'taibangle';
     const keys = [aKey, 'jia', bKey, 'dengyu', cKey, pKey];
-    playClipSequence(keys, callback);
+    const hasAllClips = keys.every(k => k && AUDIO_DATA[k]);
+    if (hasAllClips) {
+      playClipSequence(keys, callback);
+    } else {
+      // 拼接片段缺失，用 TTS 兜底
+      ttsSpeak(correctMatch[0], callback);
+    }
     return;
   }
 
-  // 兜底：播放提示音 + 给阅读时间
-  queueSpeechTask(async () => {
-    ensureAudio();
-    playTone(880, 0.15, 'sine', 0.08);
-    await waitMs(Math.max(text.length * 220, 900));
-  }, callback);
+  // 兜底：尝试 TTS 朗读，不行就播放提示音 + 给阅读时间
+  if (checkTTSAvailable()) {
+    ttsSpeak(text, callback);
+  } else {
+    queueSpeechTask(async () => {
+      ensureAudio();
+      playTone(880, 0.15, 'sine', 0.08);
+      await waitMs(Math.max(text.length * 220, 900));
+    }, callback);
+  }
 }
 
 
