@@ -1270,6 +1270,24 @@ async function _elsaSpeakAsync(text) {
       await playOneClip(fullKey);
       return;
     }
+    // 尝试用预录音频拼接："X" + "Y" + "加" + "Z" + "Y" + "等于" + "几" + "呢"
+    const itemNameToAudioKey = {
+      '雪花': 'i_xuehua', '星星': 'i_xingxing', '雪人': 'i_xueren',
+      '小鹿': 'i_xiaolu', '城堡': 'i_chengbao', '钻石': 'i_zuanshi',
+      '彩虹': 'i_caihong', '蝴蝶结': 'i_hudiejie', '皇冠': 'i_huangguan', '奖杯': 'i_jiangbei'
+    };
+    const aKey = numAudioKey[aNum];
+    const bKey = numAudioKey[bNum];
+    const iKey = itemNameToAudioKey[item1];
+    const keys = [aKey, iKey, 'jia', bKey, iKey, 'dengyu', 'ji', 'ne'].filter(k => k && AUDIO_DATA[k]);
+    if (keys.length === 8) {
+      for (const k of keys) {
+        if (_speechAbort) return;
+        await playOneClip(k);
+        await waitMs(80);
+      }
+      return;
+    }
     // 用 TTS 读（最可靠的兜底）
     await ttsPromise(text);
     return;
@@ -2283,7 +2301,7 @@ async function checkAnswer(val, btn) {
     ];
     const enc = encourages[Math.floor(Math.random() * encourages.length)];
     document.getElementById('dialogText').textContent = enc.text;
-    elsaSpeak(enc.voice);
+    await elsaSpeak(enc.voice);
 
     // 如果还没进入数一数模式，显示按钮
     if (!isCountingMode) {
@@ -2386,6 +2404,11 @@ window.addEventListener('DOMContentLoaded', () => {
   initStars();
   initSnow();
   initTTS();
+  // 自动启动背景音乐
+  ensureAudio();
+  if (!bgmPlaying) {
+    startBgm();
+  }
 });
 
 // 防止页面滚动弹跳（但允许关卡选择页面滚动）
