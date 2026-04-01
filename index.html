@@ -1123,58 +1123,34 @@ function checkTTSAvailable() {
   } catch(e) { return false; }
 }
 
-// TTS 朗读函数（通过 queueSpeechTask 排队，与音频播放串行，防止竞态）
-function ttsSpeak(text, callback) {
-  if (!window.speechSynthesis || !ttsUnlocked) {
-    if (callback) setTimeout(callback, 500);
-    return;
-  }
-  const generation = speechGeneration;
-  const startTime = Date.now();
-  queueSpeechTask((gen) => {
-    return new Promise((resolve) => {
-      if (gen !== speechGeneration) { resolve(); return; }
-      speechSynthesis.cancel();  // 取消之前的 TTS
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN';
-      utterance.rate = 0.9;
-      utterance.pitch = 1.2;
-      if (ttsVoice) utterance.voice = ttsVoice;
-      let settled = false;
-      function done() {
-        if (settled) return;
-        settled = true;
-        // 保证最小播放时长，即使 TTS 瞬间失败/结束也不会太早回调
-        const elapsed = Date.now() - startTime;
-        const minDuration = Math.max(text.length * 180, 1200);
-        const remaining = Math.max(0, minDuration - elapsed);
-        setTimeout(resolve, remaining);
-      }
-      utterance.onend = done;
-      utterance.onerror = done;
-      speechSynthesis.speak(utterance);
-      // 超时保护：20秒后强制结束
-      setTimeout(done, 20000);
-    });
-  }, callback);
-}
+// ===== 全新音频队列系统（v3 重写）=====
+// 核心设计：用 async/await while 循环替代 Promise 链，彻底消除竞态
 
-// ===== 内嵌音频播放系统（不依赖网络，100%可靠）=====
-
-let speechGeneration = 0;
-let speechQueue = Promise.resolve();
-let activeSpeechAudios = [];
+let speechGeneration = 0;        // 每次 stopCurrentSpeech 递增，用于废弃旧任务
+let activeSpeechAudios = [];     // 当前活跃的 Audio 对象
+let _aq_tasks = [];              // 任务队列
+let _aq_running = false;         // 队列是否正在处理
+let _aq_currentReject = null;    // 当前任务的 reject 句柄（用于强制中断）
 
 function removeActiveSpeechAudio(audio) {
   activeSpeechAudios = activeSpeechAudios.filter(item => item !== audio);
 }
 
+// 停止所有语音并清空队列
 function stopCurrentSpeech() {
   speechGeneration++;
-  // 同时取消 TTS
+  // 清空待执行的任务队列
+  _aq_tasks = [];
+  // 中断当前正在执行的任务
+  if (_aq_currentReject) {
+    try { _aq_currentReject('stopped'); } catch(e) {}
+    _aq_currentReject = null;
+  }
+  // 取消 TTS
   if (window.speechSynthesis) {
     try { speechSynthesis.cancel(); } catch(e) {}
   }
+  // 停止所有 Audio 对象
   activeSpeechAudios.forEach(audio => {
     try {
       audio.pause();
@@ -1186,22 +1162,96 @@ function stopCurrentSpeech() {
     } catch (e) {}
   });
   activeSpeechAudios = [];
-  speechQueue = Promise.resolve();
 }
 
 function waitMs(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// 播放单个内嵌音频片段，完成后回调
+// 队列处理器——严格线性执行
+async function _aq_process() {
+  if (_aq_running) return;
+  _aq_running = true;
+  while (_aq_tasks.length > 0) {
+    const { taskFn, callback, gen } = _aq_tasks.shift();
+    // 如果 generation 已经变了（stopCurrentSpeech 被调用），跳过此任务
+    if (gen !== speechGeneration) continue;
+    try {
+      await new Promise((resolve, reject) => {
+        _aq_currentReject = reject;
+        taskFn(gen).then(resolve).catch(resolve); // 无论成功失败都 resolve
+      });
+    } catch(e) {
+      // 被 stopCurrentSpeech 中断，跳过
+    }
+    _aq_currentReject = null;
+    // 再次检查 generation
+    if (gen !== speechGeneration) continue;
+    // 触发 callback
+    if (callback) {
+      try { callback(); } catch(e) {}
+    }
+  }
+  _aq_running = false;
+}
+
+// 向队列添加任务
+function queueSpeechTask(taskFn, callback) {
+  _aq_tasks.push({ taskFn, callback, gen: speechGeneration });
+  _aq_process();
+}
+
+// TTS 朗读函数
+function ttsSpeak(text, callback) {
+  if (!window.speechSynthesis || !ttsUnlocked) {
+    if (callback) setTimeout(callback, 500);
+    return;
+  }
+  queueSpeechTask(async (gen) => {
+    if (gen !== speechGeneration) return;
+    // 不在这里 cancel——stopCurrentSpeech 已经做了。直接说。
+    // 给浏览器一点点喘息时间（解决 cancel 后立即 speak 不生效的 bug）
+    await waitMs(50);
+    if (gen !== speechGeneration) return;
+    await new Promise((resolve) => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-CN';
+      utterance.rate = 0.9;
+      utterance.pitch = 1.2;
+      if (ttsVoice) utterance.voice = ttsVoice;
+      let settled = false;
+      const startTime = Date.now();
+      function done() {
+        if (settled) return;
+        settled = true;
+        // 最小播放时长保护
+        const elapsed = Date.now() - startTime;
+        const minDuration = Math.max(text.length * 150, 800);
+        const remaining = Math.max(0, minDuration - elapsed);
+        setTimeout(resolve, remaining);
+      }
+      utterance.onend = done;
+      utterance.onerror = done;
+      try {
+        speechSynthesis.speak(utterance);
+      } catch(e) {
+        done();
+        return;
+      }
+      // 超时保护：15秒后强制结束
+      setTimeout(done, 15000);
+    });
+  }, callback);
+}
+
+// 播放单个内嵌音频片段
 function playClipNow(key, generation) {
   return new Promise(resolve => {
     if (!AUDIO_DATA[key] || generation !== speechGeneration) {
-      setTimeout(resolve, 40);
+      resolve();
       return;
     }
 
-    // 复用或创建 Audio 对象（减少移动端Audio对象创建压力）
     const audio = new Audio();
     audio.preload = 'auto';
     audio.playbackRate = 1.12;
@@ -1215,54 +1265,41 @@ function playClipNow(key, generation) {
     const finish = (delay) => {
       if (done) return;
       done = true;
-      if (generation !== speechGeneration) { resolve(); return; } // 关键修复
       removeActiveSpeechAudio(audio);
       audio.onended = null;
       audio.onerror = null;
       audio.oncanplaythrough = null;
-      setTimeout(resolve, delay);
+      try { audio.pause(); audio.src = ''; } catch(e) {}
+      setTimeout(resolve, delay || 0);
     };
 
-    audio.onended = () => finish(90);
-    audio.onerror = () => finish(120);
-    // 超时从 5200ms 增大到 8000ms
-    setTimeout(() => finish(80), 8000);
+    audio.onended = () => finish(60);
+    audio.onerror = () => finish(80);
+    // 超时保护
+    setTimeout(() => finish(40), 8000);
 
-    // 先设置 src 让浏览器开始解码，等 canplaythrough 再播放
     audio.oncanplaythrough = function() {
       audio.oncanplaythrough = null;
-      if (done || generation !== speechGeneration) { finish(40); return; }
-      audio.play().catch(() => finish(120));
+      if (done || generation !== speechGeneration) { finish(20); return; }
+      audio.play().catch(() => finish(80));
     };
     audio.src = AUDIO_DATA[key];
-    // 兜底：如果 canplaythrough 迟迟不触发，500ms 后直接尝试播放
+    // 兜底：500ms 后直接尝试播放
     setTimeout(() => {
       if (!done && audio.oncanplaythrough) {
         audio.oncanplaythrough = null;
-        audio.play().catch(() => finish(120));
+        if (generation !== speechGeneration) { finish(20); return; }
+        audio.play().catch(() => finish(80));
       }
     }, 500);
   });
-}
-
-function queueSpeechTask(task, callback) {
-  const generation = speechGeneration;
-  speechQueue = speechQueue.then(async () => {
-    if (generation !== speechGeneration) return;
-    await task(generation);
-  }).catch(() => {}).then(() => {
-    if (generation === speechGeneration && callback) {
-      setTimeout(callback, 60);
-    }
-  });
-  return speechQueue;
 }
 
 function playClip(key, callback) {
   queueSpeechTask((generation) => playClipNow(key, generation), callback);
 }
 
-// 顺序播放多个音频片段（拼接成句子，片段间加间隔避免移动端音频丢失）
+// 顺序播放多个音频片段
 function playClipSequence(keys, callback) {
   const safeKeys = (keys || []).filter(Boolean);
   queueSpeechTask(async (generation) => {
@@ -1270,7 +1307,7 @@ function playClipSequence(keys, callback) {
       if (generation !== speechGeneration) return;
       await playClipNow(safeKeys[idx], generation);
       if (idx < safeKeys.length - 1) {
-        await waitMs(150);
+        await waitMs(120);
       }
     }
   }, callback);
