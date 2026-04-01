@@ -1130,6 +1130,7 @@ function ttsSpeak(text, callback) {
     return;
   }
   const generation = speechGeneration;
+  const startTime = Date.now();
   queueSpeechTask((gen) => {
     return new Promise((resolve) => {
       if (gen !== speechGeneration) { resolve(); return; }
@@ -1143,7 +1144,11 @@ function ttsSpeak(text, callback) {
       function done() {
         if (settled) return;
         settled = true;
-        resolve();
+        // 保证最小播放时长，即使 TTS 瞬间失败/结束也不会太早回调
+        const elapsed = Date.now() - startTime;
+        const minDuration = Math.max(text.length * 180, 1200);
+        const remaining = Math.max(0, minDuration - elapsed);
+        setTimeout(resolve, remaining);
       }
       utterance.onend = done;
       utterance.onerror = done;
@@ -1815,6 +1820,9 @@ function nextQuestion() {
     showLevelComplete();
     return;
   }
+
+  // 停止上一题残留的语音播放（防止上一题语音和本题语音互相干扰）
+  stopCurrentSpeech();
 
   questionId++; // 递增，防止旧回调干扰
   const myQid = questionId;
