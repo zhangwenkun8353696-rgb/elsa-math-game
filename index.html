@@ -1215,6 +1215,7 @@ function playClipNow(key, generation) {
     const finish = (delay) => {
       if (done) return;
       done = true;
+      if (generation !== speechGeneration) { resolve(); return; } // 关键修复
       removeActiveSpeechAudio(audio);
       audio.onended = null;
       audio.onerror = null;
