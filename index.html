@@ -1114,38 +1114,44 @@ function unlockTTS() {
 
 // 核心语音函数：说完再回调
 // 检测 TTS 是否真正可用
-let ttsAvailable = false;
-let ttsChecked = false;
-
 function checkTTSAvailable() {
-  if (ttsChecked) return ttsAvailable;
-  if (!window.speechSynthesis) { ttsChecked = true; return false; }
+  if (!window.speechSynthesis) return false;
+  if (!ttsUnlocked) return false;  // 手机端必须先解锁
   try {
     const voices = speechSynthesis.getVoices();
-    if (voices.length > 0) { ttsAvailable = true; }
-  } catch(e) {}
-  ttsChecked = true;
-  return ttsAvailable;
+    return voices.length > 0;
+  } catch(e) { return false; }
 }
 
-// TTS 朗读函数（用于没有预录音频时的兜底）
+// TTS 朗读函数（通过 queueSpeechTask 排队，与音频播放串行，防止竞态）
 function ttsSpeak(text, callback) {
-  if (!window.speechSynthesis) {
+  if (!window.speechSynthesis || !ttsUnlocked) {
     if (callback) setTimeout(callback, 500);
     return;
   }
-  // 先取消之前的 TTS（防止堆积）
-  speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'zh-CN';
-  utterance.rate = 0.9;
-  utterance.pitch = 1.2;
-  if (ttsVoice) utterance.voice = ttsVoice;
-  utterance.onend = () => { if (callback) setTimeout(callback, 100); };
-  utterance.onerror = () => { if (callback) setTimeout(callback, 200); };
-  speechSynthesis.speak(utterance);
-  // 超时保护
-  setTimeout(() => { if (callback) callback(); }, 15000);
+  const generation = speechGeneration;
+  queueSpeechTask((gen) => {
+    return new Promise((resolve) => {
+      if (gen !== speechGeneration) { resolve(); return; }
+      speechSynthesis.cancel();  // 取消之前的 TTS
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-CN';
+      utterance.rate = 0.9;
+      utterance.pitch = 1.2;
+      if (ttsVoice) utterance.voice = ttsVoice;
+      let settled = false;
+      function done() {
+        if (settled) return;
+        settled = true;
+        resolve();
+      }
+      utterance.onend = done;
+      utterance.onerror = done;
+      speechSynthesis.speak(utterance);
+      // 超时保护：20秒后强制结束
+      setTimeout(done, 20000);
+    });
+  }, callback);
 }
 
 // ===== 内嵌音频播放系统（不依赖网络，100%可靠）=====
