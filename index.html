@@ -1324,7 +1324,10 @@ function elsaSpeak(text, callback) {
     const concatKeys = [aKey, 'ge', iKey, 'jia', bKey, 'ge', iKey, 'dengyuji'];
     // 检查拼接片段是否真的都存在于 AUDIO_DATA
     const hasAllClips = concatKeys.every(k => k && AUDIO_DATA[k]);
-    if (hasAllClips) {
+    if (hasAllClips && checkTTSAvailable()) {
+      // 有拼接片段但无预录完整音频（前面已判断），优先用 TTS（更流畅，8个片段拼接在手机上太慢）
+      ttsSpeak(readMatch[0], callback);
+    } else if (hasAllClips) {
       playClipSequence(concatKeys, callback);
     } else {
       // 拼接片段缺失，用 TTS 兜底
@@ -1346,7 +1349,10 @@ function elsaSpeak(text, callback) {
     const pKey = praiseKeys[praise] || 'taibangle';
     const keys = [aKey, 'jia', bKey, 'dengyu', cKey, pKey];
     const hasAllClips = keys.every(k => k && AUDIO_DATA[k]);
-    if (hasAllClips) {
+    if (hasAllClips && checkTTSAvailable()) {
+      // 优先用 TTS（拼接多个片段在手机上不可靠）
+      ttsSpeak(correctMatch[0], callback);
+    } else if (hasAllClips) {
       playClipSequence(keys, callback);
     } else {
       // 拼接片段缺失，用 TTS 兜底
