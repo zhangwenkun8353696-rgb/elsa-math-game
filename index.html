@@ -1280,19 +1280,19 @@ async function _elsaSpeakAsync(text) {
     const bKey = numAudioKey[bNum];
     const iKey = itemNameToAudioKey[item1];
     const keys = [aKey, iKey, 'jia', bKey, iKey, 'dengyu'].filter(k => k && AUDIO_DATA[k]);
-    if (keys.length === 6) {
-      // 所有数字和物品音频都存在，拼接播放（去掉'ji'和'ne'，因为这两个音频不存在）
-      for (const k of keys) {
-        if (_speechAbort) return;
-        await playOneClip(k);
-        await waitMs(80);
-      }
-      // 用TTS补上"几呢"
-      await ttsPromise('几呢？');
-      return;
+    // 播放存在的预录音频片段（即使不完整）
+    for (const k of keys) {
+      if (_speechAbort) return;
+      await playOneClip(k);
+      await waitMs(80);
     }
-    // 用 TTS 读（最可靠的兜底）
-    await ttsPromise(text);
+    // 如果TTS可用，用TTS补上"几呢"
+    if (ttsUnlocked) {
+      await ttsPromise('几呢？');
+    } else {
+      // TTS不可用，等待一段时间
+      await waitMs(800);
+    }
     return;
   }
 
@@ -1308,17 +1308,17 @@ async function _elsaSpeakAsync(text) {
       '小公主真厉害！':'xiaogongzhuzhenlihai','太了不起了！':'tailebule','完美！':'wanmei'};
     const pKey = praiseKeys[praise] || 'taibangle';
     const keys = [aKey, 'jia', bKey, 'dengyu', cKey, pKey].filter(k => k && AUDIO_DATA[k]);
-    if (keys.length === 6) {
-      // 全部片段都有，拼接播放
-      for (const k of keys) {
-        if (_speechAbort) return;
-        await playOneClip(k);
-        await waitMs(80);
-      }
-      return;
+    // 播放存在的预录音频片段（即使不完整）
+    for (const k of keys) {
+      if (_speechAbort) return;
+      await playOneClip(k);
+      await waitMs(80);
     }
-    // 片段不全，用 TTS
-    await ttsPromise(text);
+    // 如果TTS可用，用TTS补全缺失部分
+    if (ttsUnlocked && keys.length < 6) {
+      // 只用TTS读完整的句子
+      await ttsPromise(text);
+    }
     return;
   }
 
@@ -1748,6 +1748,9 @@ function startLevel() {
   document.getElementById('dialogText').textContent = '艾莎正在准备中...✨';
   document.getElementById('optionsArea').innerHTML = '';
   document.getElementById('knowAnswerArea').innerHTML = '';
+
+  // 解锁TTS（确保音频能播放）
+  unlockTTS();
 
   // 音频已内嵌，无需预加载，直接出题
   nextQuestion();
