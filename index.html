@@ -1129,16 +1129,15 @@ function stopCurrentSpeech() {
   if (window.speechSynthesis) {
     try { speechSynthesis.cancel(); } catch(e) {}
   }
-  // 停止 Audio
-  if (_currentAudio) {
+  // 停止共享 Audio
+  if (_sharedAudio) {
     try {
-      _currentAudio.pause();
-      _currentAudio.onended = null;
-      _currentAudio.onerror = null;
-      _currentAudio.src = '';
+      _sharedAudio.pause();
+      _sharedAudio.onended = null;
+      _sharedAudio.onerror = null;
     } catch(e) {}
-    _currentAudio = null;
   }
+  _currentAudio = null;
 }
 
 // 检测 TTS 是否可用
@@ -1149,14 +1148,24 @@ function checkTTSAvailable() {
 }
 
 // 播放单个内嵌音频片段（返回 Promise）
+// 使用单例Audio对象复用，避免手机浏览器多Audio对象兼容问题
+let _sharedAudio = null;
 function playOneClip(key) {
   return new Promise(resolve => {
     if (!AUDIO_DATA[key]) { resolve(); return; }
-    const audio = new Audio();
+
+    // 复用同一个Audio对象（手机浏览器对多个Audio对象支持差）
+    if (!_sharedAudio) {
+      _sharedAudio = new Audio();
+      _sharedAudio.playsInline = true;
+    }
+    const audio = _sharedAudio;
+
+    // 先停止之前的播放
+    try { audio.pause(); } catch(e) {}
     _currentAudio = audio;
     audio.playbackRate = 1.12;
     audio.volume = 1;
-    audio.playsInline = true;
 
     let done = false;
     function finish() {
@@ -1165,8 +1174,6 @@ function playOneClip(key) {
       _currentAudio = null;
       audio.onended = null;
       audio.onerror = null;
-      audio.oncanplaythrough = null;
-      try { audio.pause(); audio.src = ''; } catch(e) {}
       resolve();
     }
 
@@ -1174,20 +1181,13 @@ function playOneClip(key) {
     audio.onerror = finish;
     setTimeout(finish, 8000); // 超时保护
 
-    audio.oncanplaythrough = function() {
-      audio.oncanplaythrough = null;
-      if (done || _speechAbort) { finish(); return; }
-      audio.play().catch(finish);
-    };
+    // 直接设置src并播放
     audio.src = AUDIO_DATA[key];
-    // 兜底
-    setTimeout(() => {
-      if (!done && audio.oncanplaythrough) {
-        audio.oncanplaythrough = null;
-        if (_speechAbort) { finish(); return; }
-        audio.play().catch(finish);
-      }
-    }, 500);
+    audio.currentTime = 0;
+    const playPromise = audio.play();
+    if (playPromise && playPromise.catch) {
+      playPromise.catch(() => { finish(); });
+    }
   });
 }
 
@@ -1240,7 +1240,6 @@ const itemNameToAudioKey = {
 async function playClipSequence(keys, gap) {
   gap = gap || 60;
   for (const k of keys) {
-    if (_speechAbort) return;
     await playOneClip(k);
     await waitMs(gap);
   }
