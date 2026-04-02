@@ -1229,6 +1229,22 @@ const itemAudioKey = {
   '👑': 'i_huangguan', '🏆': 'i_jiangbei'
 };
 const numAudioKey = { 1:'n1', 2:'n2', 3:'n3', 4:'n4', 5:'n5', 6:'n6', 7:'n7', 8:'n8', 9:'n9' };
+// 物品中文名 -> 音频 key 映射
+const itemNameToAudioKey = {
+  '雪花': 'i_xuehua', '星星': 'i_xingxing', '雪人': 'i_xueren',
+  '小鹿': 'i_xiaolu', '城堡': 'i_chengbao', '钻石': 'i_zuanshi',
+  '彩虹': 'i_caihong', '蝴蝶结': 'i_hudiejie', '皇冠': 'i_huangguan', '奖杯': 'i_jiangbei'
+};
+
+// ===== 拼接播放多个音频片段的通用函数 =====
+async function playClipSequence(keys, gap) {
+  gap = gap || 60;
+  for (const k of keys) {
+    if (_speechAbort) return;
+    await playOneClip(k);
+    await waitMs(gap);
+  }
+}
 
 // ===== 核心语音函数：elsaSpeak 返回 Promise =====
 // 兼容旧调用方式：elsaSpeak(text) 或 elsaSpeak(text, callback)
@@ -1245,7 +1261,7 @@ async function _elsaSpeakAsync(text) {
   if (!text) { await waitMs(200); return; }
   if (_speechAbort) return;
 
-  // 1. 预录完整语音
+  // 1. 预录完整语音（开场语、鼓励语等）
   const openKeys = {'小公主，来看看！':'open1','艾莎要变魔法啦！':'open2','准备好了吗？':'open3',
     '新的题来啦！':'open4','再来一题！':'open5','继续加油！':'open6','这次试试看！':'open7',
     '来看这个！':'open8','又有新题啦！':'open9','加油呀！':'open10',
@@ -1258,45 +1274,29 @@ async function _elsaSpeakAsync(text) {
   }
 
   // 2. 读题模式："X个Y，加Z个Y，等于几呢？"
+  // 拼接：n数字 + ge + i_物品 + jia + n数字 + ge + i_物品 + dengyuji
   const readMatch = text.match(/^(.+)个(.+)，加(.+)个(.+)，等于几呢？$/);
   if (readMatch) {
     const numMap = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9};
     const aNum = numMap[readMatch[1]];
     const bNum = numMap[readMatch[3]];
     const item1 = readMatch[2];
-    // 优先完整录音
-    const fullKey = 'q_' + aNum + '_' + bNum + '_' + item1;
-    if (AUDIO_DATA[fullKey]) {
-      await playOneClip(fullKey);
-      return;
-    }
-    // 尝试用预录音频拼接："X" + "Y" + "加" + "Z" + "Y" + "等于"
-    const itemNameToAudioKey = {
-      '雪花': 'i_xuehua', '星星': 'i_xingxing', '雪人': 'i_xueren',
-      '小鹿': 'i_xiaolu', '城堡': 'i_chengbao', '钻石': 'i_zuanshi',
-      '彩虹': 'i_caihong', '蝴蝶结': 'i_hudiejie', '皇冠': 'i_huangguan', '奖杯': 'i_jiangbei'
-    };
     const aKey = numAudioKey[aNum];
     const bKey = numAudioKey[bNum];
     const iKey = itemNameToAudioKey[item1];
-    const keys = [aKey, iKey, 'jia', bKey, iKey, 'dengyu'].filter(k => k && AUDIO_DATA[k]);
-    // 播放存在的预录音频片段（即使不完整）
-    for (const k of keys) {
-      if (_speechAbort) return;
-      await playOneClip(k);
-      await waitMs(80);
+    // 拼接：数字 + 个 + 物品 + 加 + 数字 + 个 + 物品 + 等于几
+    if (aKey && bKey && iKey && AUDIO_DATA[aKey] && AUDIO_DATA[bKey] && AUDIO_DATA[iKey]
+        && AUDIO_DATA['ge'] && AUDIO_DATA['jia'] && AUDIO_DATA['dengyuji']) {
+      await playClipSequence([aKey, 'ge', iKey, 'jia', bKey, 'ge', iKey, 'dengyuji']);
+      return;
     }
-    // 如果TTS可用，用TTS补上"几呢"
-    if (ttsUnlocked) {
-      await ttsPromise('几呢？');
-    } else {
-      // TTS不可用，等待一段时间
-      await waitMs(800);
-    }
+    // 兜底：TTS
+    await ttsPromise(text);
     return;
   }
 
   // 3. 答对模式："X加Y等于Z！太棒了！"
+  // 拼接：n数字 + jia + n数字 + dengyu + n数字 + 赞美
   const correctMatch = text.match(/^(.+)加(.+)等于(.+)！(.+)$/);
   if (correctMatch) {
     const numMap = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9};
@@ -1307,37 +1307,19 @@ async function _elsaSpeakAsync(text) {
     const praiseKeys = {'太棒了！':'taibangle','你真聪明！':'nizhenconming',
       '小公主真厉害！':'xiaogongzhuzhenlihai','太了不起了！':'tailebule','完美！':'wanmei'};
     const pKey = praiseKeys[praise] || 'taibangle';
-    const keys = [aKey, 'jia', bKey, 'dengyu', cKey, pKey].filter(k => k && AUDIO_DATA[k]);
-    // 播放存在的预录音频片段（即使不完整）
-    for (const k of keys) {
-      if (_speechAbort) return;
-      await playOneClip(k);
-      await waitMs(80);
+    if (aKey && bKey && cKey && pKey
+        && AUDIO_DATA[aKey] && AUDIO_DATA[bKey] && AUDIO_DATA[cKey]
+        && AUDIO_DATA['jia'] && AUDIO_DATA['dengyu'] && AUDIO_DATA[pKey]) {
+      await playClipSequence([aKey, 'jia', bKey, 'dengyu', cKey, pKey]);
+      return;
     }
-    // 如果TTS可用，用TTS补全缺失部分
-    if (ttsUnlocked && keys.length < 6) {
-      // 只用TTS读完整的句子
-      await ttsPromise(text);
-    }
-    return;
-  }
-
-  // 4. 其他文本
-  if (openKeys[text] && !AUDIO_DATA[openKeys[text]]) {
-    // 预录音频 key 存在但数据缺失
+    // 兜底：TTS
     await ttsPromise(text);
     return;
   }
 
-  // 5. 纯 TTS 兜底
-  if (checkTTSAvailable()) {
-    await ttsPromise(text);
-  } else {
-    // TTS 也不可用，播个提示音 + 等待阅读时间
-    ensureAudio();
-    playTone(880, 0.15, 'sine', 0.08);
-    await waitMs(Math.max(text.length * 220, 900));
-  }
+  // 4. 其他文本 - 纯 TTS
+  await ttsPromise(text);
 }
 
 
